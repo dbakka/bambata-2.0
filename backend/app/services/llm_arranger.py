@@ -1,9 +1,9 @@
-"""BAMBATA 2.0 - Zero-Reference Generative Arranger with Surgical Hero Vocal Isolation.
+"""BAMBATA 2.0 - Zero-Reference Generative Arranger with Deterministic Gap Surgeon Handoff.
 
-SURGICAL VOCAL ISOLATION & ANTI-CLASH DIRECTIVES:
+LLM HANDOFF DIRECTIVES:
 1. Default Deck Architecture: Deck A is the sole "Hero Vocal & Harmonic Source". Deck B is the pure "Groove & Sub-Bass Anchor".
-2. Absolute Zero-Tolerance for Vocal Overlap: If Track A's Hero Vocal is active in an arrangement block, Track B's vocal stem must be permanently deleted (volume set to 0.0). No exceptions.
-3. Instrumental Anti-Clash Pocket: Track B provides the rhythmic instrumental backing, with 1.5kHz mid-range notch carving applied whenever Deck A's vocal is singing.
+2. Deterministic Gap Surgeon Handoff: Do not attempt to micro-chop the vocals to fit into gaps. Simply output a single, continuous block where you want the vocal to generally play (e.g., 'Verse'). The backend `gap_surgeon.py` will automatically mute and unmute the vocal to weave it perfectly between Track B's beats.
+3. Absolute Zero-Tolerance for Vocal Overlap: Track B's vocal stem is set to 0.0 whenever Deck A's Hero Vocal is active.
 """
 import json
 import logging
@@ -29,19 +29,12 @@ class LLMArranger:
         cut_to_the_chase: bool = False
     ) -> Dict[str, Any]:
         """
-        Generates arrangements enforcing:
-        - Sole Hero Vocal (Deck A)
-        - Absolute zero vocal overlap (Deck B Vocals = 0.0 when Deck A sings)
-        - Dynamic 1.5kHz instrumental notch on Deck B melody
+        Generates continuous arrangement blocks and delegates micro-chopping to gap_surgeon.py.
         """
         grid = PhraseGrid(bpm=bpm)
         key_a = track_a_meta.get("key", "8A")
         key_b = track_b_meta.get("key", "10A")
         pivot_data = calculate_optimal_pivot_key(key_a, key_b)
-
-        prof_a = track_a_meta.get("vocal_profile", "Sustained Lead")
-        prof_b = track_b_meta.get("vocal_profile", "Rhythmic Chant")
-        silent_windows_a = track_a_meta.get("silent_windows", [])
 
         # 1. "CUT TO THE CHASE" MACRO EXECUTION
         if cut_to_the_chase:
@@ -65,10 +58,9 @@ class LLMArranger:
                     "deck_a_role": "Hero Vocal Source (Track A Lead Riser)",
                     "deck_b_role": "Groove & Rhythm Source (Track B Snare Roll)"
                 },
-                "anti_clash_dsp": {
-                    "hero_vocal_gating": "NoiseGate(-35dB, ratio=4.0, release=150ms)",
-                    "track_b_melody_notch": "PeakFilter(1500Hz, Q=2.0, -6.0dB)",
-                    "vocal_overlap_permitted": False
+                "dsp_directives": {
+                    "kill_the_beat_filter": "Highpass(250Hz) + NoiseGate(-25dB, release=50ms)",
+                    "gap_surgeon": "Deterministic numpy RMS masking active"
                 },
                 "pre_drop_silence_gap_ms": grid.bars_to_ms(1),
                 "stem_levels_track_a": {"Vocals": 0.95, "Melody": 0.4, "Bass": 0.0, "Drums": 0.0},
@@ -85,15 +77,14 @@ class LLMArranger:
                 "end_ms": current_ms + s2_ms,
                 "bars": drop_bars,
                 "deck_architecture": {
-                    "deck_a_role": "Track A Sole Hero Vocal & Melodic Hooks",
+                    "deck_a_role": "Track A Continuous Hero Vocal",
                     "deck_b_role": "Track B Pure Instrumental Groove (4/4 Kick & Sub-Bass)"
                 },
-                "anti_clash_dsp": {
-                    "hero_vocal_gating": "NoiseGate(-35dB, ratio=4.0, release=150ms)",
-                    "track_b_melody_notch": "PeakFilter(1500Hz, Q=2.0, -6.0dB)",
-                    "vocal_overlap_permitted": False
+                "dsp_directives": {
+                    "kill_the_beat_filter": "Highpass(250Hz) + NoiseGate(-25dB, release=50ms)",
+                    "gap_surgeon": "Deterministic numpy RMS masking active"
                 },
-                "stem_levels_track_a": {"Vocals": 1.3, "Melody": 0.45, "Bass": 0.0, "Drums": 0.0},
+                "stem_levels_track_a": {"Vocals": 1.35, "Melody": 0.45, "Bass": 0.0, "Drums": 0.0},
                 "stem_levels_track_b": {"Vocals": 0.0, "Melody": 0.2, "Bass": 1.0, "Drums": 1.0}
             })
             current_ms += s2_ms
@@ -115,14 +106,13 @@ class LLMArranger:
             })
 
             return {
-                "mode": "SURGICAL_ANTI_CLASH_CUT_TO_THE_CHASE",
+                "mode": "DETERMINISTIC_GAP_SURGERY_CUT_TO_THE_CHASE",
                 "bpm": bpm,
                 "cut_to_the_chase": True,
-                "anti_clash_pipeline": {
-                    "sole_hero_vocal_deck": "Deck A",
-                    "noise_gating": "NoiseGate(threshold=-35dB, release=150ms)",
-                    "mid_range_notch": "PeakFilter(1500Hz, Q=2.0, gain=-6.0dB)",
-                    "zero_vocal_overlap": True
+                "dsp_pipeline": {
+                    "vocal_filter": "HighpassFilter(250Hz) + NoiseGate(-25dB, ratio=10.0, release=50ms)",
+                    "gap_surgeon": "apply_vocal_gap_mask(10ms crossfade)",
+                    "anti_clash_notch": "PeakFilter(1500Hz, Q=2.0, -6dB)"
                 },
                 "pivot_key_data": pivot_data,
                 "total_duration_s": round((current_ms + s3_ms) / 1000.0, 1),
@@ -154,11 +144,6 @@ class LLMArranger:
                 "deck_a": "Gated Hero Vocal Tease",
                 "deck_b": "Filtered Drum Groove"
             },
-            "anti_clash_dsp": {
-                "hero_vocal_gating": "NoiseGate(-35dB, ratio=4.0, release=150ms)",
-                "track_b_melody_notch": "PeakFilter(1500Hz, Q=2.0, -6.0dB)",
-                "vocal_overlap_permitted": False
-            },
             "stem_levels_track_a": {"Vocals": 0.85, "Melody": 0.4, "Bass": 0.0, "Drums": 0.0},
             "stem_levels_track_b": {"Vocals": 0.0, "Melody": 0.2, "Bass": 0.0, "Drums": 0.75}
         })
@@ -173,13 +158,11 @@ class LLMArranger:
             "end_ms": current_ms + s2_ms,
             "bars": verse_bars,
             "deck_architecture": {
-                "deck_a": "Sole Hero Storytelling Vocal (Hero Mid/High)",
-                "deck_b": "Driving Bassline & Solid Kick/Snare (Hero Low End)"
+                "deck_a": "Sole Hero Storytelling Vocal (Continuous Block)",
+                "deck_b": "Driving Bassline & Solid Kick/Snare"
             },
-            "anti_clash_dsp": {
-                "hero_vocal_gating": "NoiseGate(-35dB, ratio=4.0, release=150ms)",
-                "track_b_melody_notch": "PeakFilter(1500Hz, Q=2.0, -6.0dB)",
-                "vocal_overlap_permitted": False
+            "dsp_directives": {
+                "gap_surgeon": "Continuous vocal array passed to apply_vocal_gap_mask to duck around Track B beats"
             },
             "stem_levels_track_a": {"Vocals": 1.25, "Melody": 0.55, "Bass": 0.0, "Drums": 0.0},
             "stem_levels_track_b": {"Vocals": 0.0, "Melody": 0.2, "Bass": 0.85, "Drums": 0.95}
@@ -198,11 +181,6 @@ class LLMArranger:
                 "deck_a": "Rising Hero Vocal Riser",
                 "deck_b": "Accelerating Snare Roll Riser"
             },
-            "anti_clash_dsp": {
-                "hero_vocal_gating": "NoiseGate(-35dB, ratio=4.0, release=150ms)",
-                "track_b_melody_notch": "PeakFilter(1500Hz, Q=2.0, -6.0dB)",
-                "vocal_overlap_permitted": False
-            },
             "pre_drop_silence_gap_ms": grid.bars_to_ms(1),
             "stem_levels_track_a": {"Vocals": 1.15, "Melody": 0.3, "Bass": 0.0, "Drums": 0.0},
             "stem_levels_track_b": {"Vocals": 0.0, "Melody": 0.2, "Bass": 0.0, "Drums": 1.0}
@@ -218,13 +196,11 @@ class LLMArranger:
             "end_ms": current_ms + s4_ms,
             "bars": drop_bars,
             "deck_architecture": {
-                "deck_a": "Track A Sole Hero Anthem Vocals (Dominant High/Mid)",
-                "deck_b": "Track B Heavy Sub-Bass & 4/4 Punchy Drums (Dominant Low End)"
+                "deck_a": "Track A Hero Vocal Hook",
+                "deck_b": "Track B Heavy Sub-Bass & 4/4 Punchy Drums"
             },
-            "anti_clash_dsp": {
-                "hero_vocal_gating": "NoiseGate(-35dB, ratio=4.0, release=150ms)",
-                "track_b_melody_notch": "PeakFilter(1500Hz, Q=2.0, -6.0dB)",
-                "vocal_overlap_permitted": False
+            "dsp_directives": {
+                "gap_surgeon": "Hero vocal ducks during transient peaks and unmutes in vocal pockets"
             },
             "stem_levels_track_a": {"Vocals": 1.35, "Melody": 0.35, "Bass": 0.0, "Drums": 0.0},
             "stem_levels_track_b": {"Vocals": 0.0, "Melody": 0.2, "Bass": 1.0, "Drums": 1.0}
@@ -248,14 +224,13 @@ class LLMArranger:
         })
 
         return {
-            "mode": "SURGICAL_ANTI_CLASH_ARCHITECTURE",
+            "mode": "DETERMINISTIC_GAP_SURGERY_PIPELINE",
             "bpm": bpm,
-            "anti_clash_pipeline": {
-                "sole_hero_vocal_deck": "Deck A",
-                "noise_gating": "NoiseGate(threshold=-35dB, release=150ms)",
-                "mid_range_notch": "PeakFilter(1500Hz, Q=2.0, gain=-6.0dB)",
-                "zero_vocal_overlap": True
-            },
+            "llm_handoff_rules": [
+                "LLM outputs continuous vocal blocks (e.g. Verse, Drop Hook).",
+                "Python gap_surgeon.py calculates RMS loudness of Track B and applies 10ms crossfaded muting during beats.",
+                "HighpassFilter(250Hz) + NoiseGate(-25dB, 50ms) strips low-end bleed."
+            ],
             "default_deck_architecture": {
                 "deck_a": "Track A (Left Deck) -> Sole Hero Vocal & Harmonic Source",
                 "deck_b": "Track B (Right Deck) -> Pure Groove & Sub-Bass Anchor"
@@ -318,7 +293,7 @@ class LLMArranger:
                 if la.get("Vocals", 0) > 0.8:
                     la["Vocals"] = 0.95
                     lb["Melody"] = 0.15
-                lb["Vocals"] = 0.0  # Enforce zero secondary vocal
+                lb["Vocals"] = 0.0
 
                 block_res["stem_levels_track_a"] = la
                 block_res["stem_levels_track_b"] = lb
@@ -328,7 +303,6 @@ class LLMArranger:
                 la = dict(blk.get("stem_levels_track_a", {}))
                 lb = dict(blk.get("stem_levels_track_b", {}))
 
-                # Swap dominant melodic lead while maintaining zero vocal clash
                 if la.get("Vocals", 0) > 0.5:
                     la["Vocals"] = 0.0
                     lb["Vocals"] = 1.2

@@ -1,11 +1,13 @@
-"""BAMBATA 2.0 - Core DSP Audio Processing Engine with Surgical Vocal Isolation & Anti-Clash Pipeline.
+"""BAMBATA 2.0 - Core DSP Audio Processing Engine with "Kill the Beat" Vocal Filter & Gap Surgeon.
 
 Features:
-1. High-Fidelity Vocal Gating (NoiseGate threshold_db=-35.0, ratio=4.0, release_ms=150).
-2. Dynamic Vocal Notch / Anti-Clash Carving (PeakingFilter cutoff=1500Hz, q=2.0, gain_db=-6.0 on Track B).
-3. Formant-Preserved Pitch Shifting (pyrubberband formants=True).
-4. Phase-Coherent Audio Welding (weld_audio with zero-crossing crossfade).
-5. Demucs v4 4-Stem Separation.
+1. "Kill the Beat" Vocal Filter:
+   - HighpassFilter(cutoff_frequency_hz=250.0) -> Deletes all kick/bass bleed.
+   - NoiseGate(threshold_db=-25.0, ratio=10.0, release_ms=50) -> Snaps to pure 0.0 silence.
+2. Deterministic Vocal Gap Masking (RMS envelope weaving).
+3. Anti-Clash 1.5kHz Notch Carving (PeakFilter 1500Hz, Q=2.0, -6dB).
+4. Formant-Preserved Pitch Shifting.
+5. Demucs v4 Separation.
 """
 import os
 import logging
@@ -33,16 +35,18 @@ except ImportError:
     HAS_PEDALBOARD = False
 
 
-def apply_high_fidelity_vocal_gate(
+def apply_kill_the_beat_vocal_filter(
     vocal_audio: np.ndarray,
     sample_rate: int = 44100,
-    threshold_db: float = -35.0,
-    ratio: float = 4.0,
-    release_ms: float = 150.0
+    cutoff_hz: float = 250.0,
+    gate_threshold_db: float = -25.0,
+    gate_ratio: float = 10.0,
+    gate_release_ms: float = 50.0
 ) -> np.ndarray:
     """
-    Passes Track A's Hero Vocal through a strict Noise Gate.
-    Ensures 100% digital silence during singer pauses, eliminating breath noise & background bleed.
+    "Kill the Beat" Vocal Filter:
+    1. 250Hz HighpassFilter -> Completely deletes kicks, basslines, and log drums from vocal stem.
+    2. Strict NoiseGate(-25dB, ratio=10.0, release=50ms) -> Snaps audio to digital 0.0 silence.
     """
     if len(vocal_audio) == 0:
         return vocal_audio
@@ -53,33 +57,92 @@ def apply_high_fidelity_vocal_gate(
     if HAS_PEDALBOARD:
         try:
             board = Pedalboard([
-                HighpassFilter(cutoff_frequency_hz=120.0),
+                HighpassFilter(cutoff_frequency_hz=cutoff_hz),
                 NoiseGate(
-                    threshold_db=threshold_db,
-                    ratio=ratio,
-                    release_ms_ratio=release_ms
-                ) if hasattr(NoiseGate, 'release_ms_ratio') else NoiseGate(threshold_db=threshold_db, ratio=ratio)
+                    threshold_db=gate_threshold_db,
+                    ratio=gate_ratio,
+                    release_ms_ratio=gate_release_ms
+                ) if hasattr(NoiseGate, 'release_ms_ratio') else NoiseGate(threshold_db=gate_threshold_db, ratio=gate_ratio)
             ])
             processed = board(vocal_audio.T.astype(np.float32), sample_rate).T
             return processed.astype(np.float32)
         except Exception as e:
-            logger.warning(f"Pedalboard NoiseGate failed: {e}. Using smooth envelope gate.")
+            logger.warning(f"Pedalboard 'Kill the Beat' gate failed: {e}. Using scipy/numpy chain.")
 
-    # High-precision envelope-follower noise gate fallback
-    mono = np.mean(vocal_audio, axis=1)
-    frame_len = int(0.010 * sample_rate)  # 10ms rms window
+    # High-order Butterworth 250Hz Highpass Filter fallback
+    sos_high = signal.butter(6, cutoff_hz, 'highpass', fs=sample_rate, output='sos')
+    filtered = signal.sosfilt(sos_high, vocal_audio, axis=0)
+
+    # Fast 50ms Noise Gate Fallback (-25dB threshold)
+    mono = np.mean(filtered, axis=1)
+    frame_len = max(2, int(0.005 * sample_rate))
     kernel = np.ones(frame_len) / frame_len
     rms = np.sqrt(np.convolve(mono ** 2, kernel, mode='same'))
 
-    thresh_lin = 10.0 ** (threshold_db / 20.0)
+    thresh_lin = 10.0 ** (gate_threshold_db / 20.0)
     gate_mask = np.where(rms >= thresh_lin, 1.0, 0.0)
 
-    # Smooth release envelope (150ms)
-    release_samples = int((release_ms / 1000.0) * sample_rate)
+    release_samples = max(2, int((gate_release_ms / 1000.0) * sample_rate))
     smoothed_gate = np.convolve(gate_mask, np.ones(release_samples) / release_samples, mode='same')
-    smoothed_gate = np.clip(smoothed_gate * ratio, 0.0, 1.0)[:, np.newaxis]
+    smoothed_gate = np.clip(smoothed_gate * gate_ratio, 0.0, 1.0)[:, np.newaxis]
 
-    return (vocal_audio * smoothed_gate).astype(np.float32)
+    return (filtered * smoothed_gate).astype(np.float32)
+
+
+def apply_vocal_gap_mask(
+    vocal_stem: np.ndarray,
+    instrumental_stem: np.ndarray,
+    sample_rate: int = 44100,
+    frame_ms: float = 25.0,
+    loudness_threshold_rms: float = 0.08,
+    crossfade_ms: float = 10.0
+) -> np.ndarray:
+    """
+    Deterministic Gap Surgeon:
+    Multiplies vocal_stem by 0.0 during loud instrumental transients and 1.0 during silence gaps,
+    with 10ms click-free cosine crossfades.
+    """
+    if len(vocal_stem) == 0:
+        return vocal_stem
+
+    is_1d = vocal_stem.ndim == 1
+    if is_1d:
+        vocal_stem = np.column_stack((vocal_stem, vocal_stem))
+    if instrumental_stem.ndim == 1:
+        instrumental_stem = np.column_stack((instrumental_stem, instrumental_stem))
+
+    target_len = len(vocal_stem)
+    if len(instrumental_stem) < target_len:
+        pad_len = target_len - len(instrumental_stem)
+        inst_matched = np.vstack((instrumental_stem, np.zeros((pad_len, 2), dtype=np.float32)))
+    else:
+        inst_matched = instrumental_stem[:target_len]
+
+    inst_mono = np.mean(inst_matched, axis=1)
+    frame_samples = max(4, int((frame_ms / 1000.0) * sample_rate))
+    kernel = np.ones(frame_samples, dtype=np.float32) / frame_samples
+    inst_rms = np.sqrt(np.convolve(inst_mono ** 2, kernel, mode='same'))
+
+    max_rms = np.max(inst_rms) if len(inst_rms) > 0 else 0.0
+    if max_rms > 0.01:
+        dynamic_thresh = max(loudness_threshold_rms, np.percentile(inst_rms, 60) * 0.85)
+    else:
+        dynamic_thresh = loudness_threshold_rms
+
+    raw_mask = np.where(inst_rms < dynamic_thresh, 1.0, 0.0).astype(np.float32)
+
+    fade_samples = max(2, int((crossfade_ms / 1000.0) * sample_rate))
+    smoothing_kernel = np.hanning(fade_samples)
+    smoothing_kernel /= np.sum(smoothing_kernel)
+
+    smooth_mask = np.convolve(raw_mask, smoothing_kernel, mode='same')
+    smooth_mask = np.clip(smooth_mask, 0.0, 1.0)[:, np.newaxis]
+
+    surgically_masked_vocal = vocal_stem * smooth_mask
+
+    if is_1d:
+        return surgically_masked_vocal[:, 0].astype(np.float32)
+    return surgically_masked_vocal.astype(np.float32)
 
 
 def apply_anti_clash_vocal_notch(
@@ -90,10 +153,6 @@ def apply_anti_clash_vocal_notch(
     q: float = 2.0,
     gain_db: float = -6.0
 ) -> np.ndarray:
-    """
-    Applies a sharp 1.5kHz Peaking Notch Filter (-6.0dB, Q=2.0) on Track B's mid-range/melody stem.
-    Scoops out the vocal presence band so Track A's Hero Vocal sits cleanly without frequency clashes.
-    """
     if len(track_b_melody) == 0 or not hero_vocal_active:
         return track_b_melody
 
@@ -110,7 +169,6 @@ def apply_anti_clash_vocal_notch(
         except Exception as e:
             logger.warning(f"Pedalboard PeakFilter failed: {e}. Using biquad notch fallback.")
 
-    # Biquad peaking notch filter fallback
     w0 = 2 * np.pi * cutoff_hz / sample_rate
     alpha = np.sin(w0) / (2 * q)
     A = 10.0 ** (gain_db / 40.0)
@@ -135,7 +193,6 @@ def weld_audio(
     sample_rate: int = 44100,
     crossfade_ms: float = 50.0
 ) -> np.ndarray:
-    """Phase-Coherent Audio Stitching for Infinite Extend with zero-crossing crossfading."""
     if len(existing_audio) == 0:
         return extension_audio
     if len(extension_audio) == 0:
@@ -173,99 +230,31 @@ class AudioDSPEngine:
     def __init__(self, sample_rate: int = 44100):
         self.sample_rate = sample_rate
 
-    def process_hero_vocal_and_instrumental_pair(
+    def process_and_weave_hero_vocal(
         self,
-        hero_vocal_stem: np.ndarray,
-        track_b_melody_stem: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
+        raw_vocal_stem: np.ndarray,
+        instrumental_stem: np.ndarray
+    ) -> np.ndarray:
         """
-        Applies high-fidelity vocal gating on Track A's hero vocal and
-        anti-clash 1.5kHz notch carving on Track B's instrumental melody.
+        1. Deletes beat bleed with 250Hz Highpass & -25dB Noise Gate.
+        2. Weaves the vocal deterministically into instrumental silence gaps.
         """
-        # 1. Gate Hero Vocal
-        gated_vocal = apply_high_fidelity_vocal_gate(
-            vocal_audio=hero_vocal_stem,
+        cleaned_vocal = apply_kill_the_beat_vocal_filter(
+            vocal_audio=raw_vocal_stem,
             sample_rate=self.sample_rate,
-            threshold_db=-35.0,
-            ratio=4.0,
-            release_ms=150.0
+            cutoff_hz=250.0,
+            gate_threshold_db=-25.0,
+            gate_ratio=10.0,
+            gate_release_ms=50.0
         )
 
-        # 2. Notch Track B Melody to carve pocket for Hero Vocal
-        carved_melody = apply_anti_clash_vocal_notch(
-            track_b_melody=track_b_melody_stem,
-            hero_vocal_active=True,
+        woven_vocal = apply_vocal_gap_mask(
+            vocal_stem=cleaned_vocal,
+            instrumental_stem=instrumental_stem,
             sample_rate=self.sample_rate,
-            cutoff_hz=1500.0,
-            q=2.0,
-            gain_db=-6.0
+            frame_ms=25.0,
+            loudness_threshold_rms=0.08,
+            crossfade_ms=10.0
         )
 
-        return gated_vocal, carved_melody
-
-    def separate_stems_demucs(self, audio_path: str, output_dir: str) -> Dict[str, str]:
-        out_path = Path(output_dir)
-        out_path.mkdir(parents=True, exist_ok=True)
-
-        try:
-            import torch
-            from demucs.pretrained import get_model
-            from demucs.apply import apply_model
-
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            model = get_model("htdemucs")
-            model.to(device)
-
-            audio, sr = sf.read(audio_path, dtype='float32')
-            if audio.ndim == 1:
-                audio = np.column_stack((audio, audio))
-            
-            tensor_audio = torch.tensor(audio.T, dtype=torch.float32).unsqueeze(0).to(device)
-            with torch.no_grad():
-                sources = apply_model(model, tensor_audio, device=device, split=True, overlap=0.25)
-                sources = sources.squeeze(0).cpu().numpy()
-
-            stem_names = ["drums", "bass", "other", "vocals"]
-            stem_files = {}
-            for idx, name in enumerate(stem_names):
-                stem_data = sources[idx].T
-                file_dest = out_path / f"{name}.wav"
-                sf.write(str(file_dest), stem_data, sr)
-                stem_files[name] = str(file_dest)
-
-            return stem_files
-        except Exception as e:
-            logger.warning(f"Demucs fallback: {e}")
-            return self._separate_stems_filterbank_fallback(audio_path, output_dir)
-
-    def _separate_stems_filterbank_fallback(self, audio_path: str, output_dir: str) -> Dict[str, str]:
-        out_path = Path(output_dir)
-        out_path.mkdir(parents=True, exist_ok=True)
-
-        audio, sr = sf.read(audio_path, dtype='float32')
-        if audio.ndim == 1:
-            audio = np.column_stack((audio, audio))
-
-        sos_bass = signal.butter(4, 150, 'lowpass', fs=sr, output='sos')
-        bass = signal.sosfilt(sos_bass, audio, axis=0)
-
-        sos_drums = signal.butter(4, [50, 4000], 'bandpass', fs=sr, output='sos')
-        drums = signal.sosfilt(sos_drums, audio, axis=0) * 0.8
-
-        center_channel = (audio[:, 0] + audio[:, 1]) / 2.0
-        sos_vocal = signal.butter(4, [240, 3800], 'bandpass', fs=sr, output='sos')
-        vocal_mono = signal.sosfilt(sos_vocal, center_channel)
-        vocals = np.column_stack((vocal_mono, vocal_mono))
-
-        side_channel = (audio[:, 0] - audio[:, 1]) / 2.0
-        sos_high = signal.butter(4, 3500, 'highpass', fs=sr, output='sos')
-        highs = signal.sosfilt(sos_high, audio, axis=0)
-        other = highs + np.column_stack((side_channel, -side_channel)) * 0.7
-
-        stem_files = {}
-        for name, data in [("drums", drums), ("bass", bass), ("other", other), ("vocals", vocals)]:
-            file_dest = out_path / f"{name}.wav"
-            sf.write(str(file_dest), np.clip(data, -1.0, 1.0), sr)
-            stem_files[name] = str(file_dest)
-
-        return stem_files
+        return woven_vocal

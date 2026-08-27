@@ -38,10 +38,10 @@ interface ReconstructionStage {
 }
 
 const RECONSTRUCTION_STAGES: ReconstructionStage[] = [
-  { step: 1, label: 'Stem Separation', percent: 25 },
-  { step: 2, label: 'Hero Vocal Isolation', percent: 50 },
-  { step: 3, label: 'Phrase Quantization', percent: 75 },
-  { step: 4, label: 'Master Bus Glue', percent: 100 },
+  { step: 1, label: 'Kill the Beat 250Hz Highpass & Noise Gate', percent: 25 },
+  { step: 2, label: 'Deterministic Gap Surgery (RMS Weaving)', percent: 50 },
+  { step: 3, label: 'Phrase Quantization & Dynamic Notch', percent: 75 },
+  { step: 4, label: 'Spotify Pedalboard Master Glue', percent: 100 },
 ];
 
 export default function DJStudioPage() {
@@ -406,18 +406,18 @@ export default function DJStudioPage() {
   const regionDuration = Math.max(1, regionEndSec - regionStartSec);
 
   return (
-    <div className="min-h-screen bg-[#07080b] text-[#eceff8] flex flex-col justify-between selection:bg-cyan-500/20 selection:text-cyan-300 font-sans tracking-tight">
+    <div className="min-h-screen bg-white text-zinc-900 flex flex-col justify-between selection:bg-pink-500/20 selection:text-pink-600 font-sans tracking-tight">
       
-      {/* Sleek Minimalist Studio Header */}
-      <header className="border-b border-white/[0.06] py-4 px-6 sm:px-10">
+      {/* Sleek Minimalist Studio Header (Light Mode Pink Theme) */}
+      <header className="border-b border-zinc-100 py-4 px-6 sm:px-10 bg-white sticky top-0 z-30">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-400 to-indigo-600 flex items-center justify-center text-black font-black text-sm shadow-md shadow-cyan-500/20">
+            <div className="w-8 h-8 rounded-xl bg-pink-500 flex items-center justify-center text-white font-black text-sm shadow-md shadow-pink-500/30">
               B
             </div>
             <div className="flex items-baseline gap-2.5">
-              <span className="text-sm font-extrabold tracking-widest uppercase text-white">BAMBATA 2.0</span>
-              <span className="text-[10px] font-mono text-cyan-400/80 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-500/20">
+              <span className="text-sm font-extrabold tracking-widest uppercase text-zinc-900">BAMBATA 2.0</span>
+              <span className="text-[10px] font-mono text-pink-600 bg-pink-50 px-2 py-0.5 rounded-md border border-pink-200">
                 {compatibilityReason}
               </span>
             </div>
@@ -428,7 +428,7 @@ export default function DJStudioPage() {
               <button
                 type="button"
                 onClick={handleResetAll}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 transition-colors"
                 title="Reset session"
               >
                 <RotateCcw className="w-4 h-4" />
@@ -439,17 +439,17 @@ export default function DJStudioPage() {
       </header>
 
       {/* Primary Studio Workspace */}
-      <main className="max-w-5xl mx-auto px-6 py-8 w-full space-y-8 flex-1">
+      <main className="max-w-5xl mx-auto px-6 py-8 w-full space-y-6 flex-1">
         
         {/* SECTION 1: Dual-Deck Inputs */}
         <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           
           {/* Deck A (Left Deck - Hero Vocal) */}
-          <div className="bg-[#0e0f17] border border-white/[0.08] hover:border-cyan-500/30 rounded-2xl p-5 space-y-4 transition-colors relative group">
+          <div className="bg-zinc-50 border border-zinc-200/80 hover:border-pink-300 rounded-2xl p-5 space-y-4 transition-all shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-cyan-400">
+                <span className="w-2 h-2 rounded-full bg-pink-500" />
+                <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-pink-600">
                   DECK A • HERO VOCAL
                 </span>
               </div>
@@ -458,8 +458,8 @@ export default function DJStudioPage() {
                 onClick={() => togglePlaySingle('track_1', track1File)}
                 className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
                   playingSingle === 'track_1'
-                    ? 'bg-rose-500 text-white'
-                    : 'bg-white/10 hover:bg-cyan-400 hover:text-black text-slate-300'
+                    ? 'bg-zinc-900 text-white'
+                    : 'bg-white hover:bg-pink-500 hover:text-white text-zinc-700 shadow-sm border border-zinc-200'
                 }`}
                 title={playingSingle === 'track_1' ? 'Pause Deck A' : 'Audition Deck A'}
               >
@@ -467,14 +467,14 @@ export default function DJStudioPage() {
               </button>
             </div>
 
-            <label className="border border-dashed border-white/10 hover:border-cyan-400/40 rounded-xl p-4 flex items-center justify-between gap-3 cursor-pointer bg-[#080910] transition-colors">
+            <label className="border border-dashed border-zinc-200 hover:border-pink-400 rounded-xl p-4 flex items-center justify-between gap-3 cursor-pointer bg-white transition-colors">
               <div className="flex items-center gap-3 truncate">
-                <FileAudio className="w-4 h-4 text-cyan-400/70 flex-shrink-0" />
-                <span className="text-xs text-slate-300 font-medium truncate">
+                <FileAudio className="w-4 h-4 text-pink-500 flex-shrink-0" />
+                <span className="text-xs text-zinc-800 font-medium truncate">
                   {track1Name}
                 </span>
               </div>
-              <Upload className="w-3.5 h-3.5 text-slate-500 group-hover:text-cyan-400 flex-shrink-0" />
+              <Upload className="w-3.5 h-3.5 text-zinc-400 group-hover:text-pink-500 flex-shrink-0" />
               <input
                 type="file"
                 accept="audio/*,.mp3,.wav,.m4a"
@@ -485,11 +485,11 @@ export default function DJStudioPage() {
           </div>
 
           {/* Deck B (Right Deck - Rhythm & Bass) */}
-          <div className="bg-[#0e0f17] border border-white/[0.08] hover:border-purple-500/30 rounded-2xl p-5 space-y-4 transition-colors relative group">
+          <div className="bg-zinc-50 border border-zinc-200/80 hover:border-pink-300 rounded-2xl p-5 space-y-4 transition-all shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-purple-400" />
-                <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-purple-400">
+                <span className="w-2 h-2 rounded-full bg-zinc-400" />
+                <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-zinc-600">
                   DECK B • GROOVE &amp; BASS
                 </span>
               </div>
@@ -498,8 +498,8 @@ export default function DJStudioPage() {
                 onClick={() => togglePlaySingle('track_2', track2File)}
                 className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
                   playingSingle === 'track_2'
-                    ? 'bg-rose-500 text-white'
-                    : 'bg-white/10 hover:bg-purple-400 hover:text-black text-slate-300'
+                    ? 'bg-zinc-900 text-white'
+                    : 'bg-white hover:bg-pink-500 hover:text-white text-zinc-700 shadow-sm border border-zinc-200'
                 }`}
                 title={playingSingle === 'track_2' ? 'Pause Deck B' : 'Audition Deck B'}
               >
@@ -507,14 +507,14 @@ export default function DJStudioPage() {
               </button>
             </div>
 
-            <label className="border border-dashed border-white/10 hover:border-purple-400/40 rounded-xl p-4 flex items-center justify-between gap-3 cursor-pointer bg-[#080910] transition-colors">
+            <label className="border border-dashed border-zinc-200 hover:border-pink-400 rounded-xl p-4 flex items-center justify-between gap-3 cursor-pointer bg-white transition-colors">
               <div className="flex items-center gap-3 truncate">
-                <FileAudio className="w-4 h-4 text-purple-400/70 flex-shrink-0" />
-                <span className="text-xs text-slate-300 font-medium truncate">
+                <FileAudio className="w-4 h-4 text-zinc-500 flex-shrink-0" />
+                <span className="text-xs text-zinc-800 font-medium truncate">
                   {track2Name}
                 </span>
               </div>
-              <Upload className="w-3.5 h-3.5 text-slate-500 group-hover:text-purple-400 flex-shrink-0" />
+              <Upload className="w-3.5 h-3.5 text-zinc-400 group-hover:text-pink-500 flex-shrink-0" />
               <input
                 type="file"
                 accept="audio/*,.mp3,.wav,.m4a"
@@ -527,13 +527,13 @@ export default function DJStudioPage() {
         </section>
 
         {/* SECTION 2: Control Toolbar & Generator */}
-        <section className="bg-[#0b0c13] border border-white/[0.06] rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <section className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
           
           <div className="flex items-center gap-2 w-full sm:w-auto">
             
             {/* Reference Clip Drop / Surprise */}
-            <label className="flex-1 sm:flex-initial flex items-center gap-2 px-3 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] cursor-pointer text-xs font-mono text-slate-300 transition-colors" title="Reference arrangement style">
-              <Headphones className="w-3.5 h-3.5 text-slate-400" />
+            <label className="flex-1 sm:flex-initial flex items-center gap-2 px-3 py-2 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 cursor-pointer text-xs font-mono text-zinc-700 transition-colors shadow-xs" title="Reference arrangement style">
+              <Headphones className="w-3.5 h-3.5 text-zinc-400" />
               <span className="truncate max-w-[140px]">{refFile ? refFile.name : blueprint.title}</span>
               <input
                 type="file"
@@ -546,7 +546,7 @@ export default function DJStudioPage() {
             <button
               type="button"
               onClick={handleSurpriseMe}
-              className="p-2.5 rounded-xl bg-white/[0.04] hover:bg-purple-500/20 text-slate-400 hover:text-purple-300 border border-white/[0.08] transition-colors"
+              className="p-2.5 rounded-xl bg-white hover:bg-pink-50 text-zinc-600 hover:text-pink-600 border border-zinc-200 transition-colors shadow-xs"
               title="Surprise Reference Style"
             >
               <Dices className="w-4 h-4" />
@@ -558,8 +558,8 @@ export default function DJStudioPage() {
               onClick={() => setCutToTheChase((prev) => !prev)}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-mono border transition-all ${
                 cutToTheChase
-                  ? 'bg-amber-500/20 border-amber-400/60 text-amber-300'
-                  : 'bg-white/[0.04] border-white/[0.08] text-slate-400 hover:text-white'
+                  ? 'bg-pink-50 border-pink-300 text-pink-600 font-bold'
+                  : 'bg-white border-zinc-200 text-zinc-600 hover:text-zinc-900 shadow-xs'
               }`}
               title="Skip intro and drop immediately into sweet spot"
             >
@@ -568,12 +568,12 @@ export default function DJStudioPage() {
             </button>
           </div>
 
-          {/* Big Reconstruct Trigger */}
+          {/* Big Reconstruct Trigger (Vibrant Pink Theme) */}
           <button
             type="button"
             onClick={handleStartDeepReconstruction}
             disabled={isProcessing}
-            className="w-full sm:w-auto flex items-center justify-center gap-2.5 bg-gradient-to-r from-cyan-400 to-indigo-500 hover:from-cyan-300 hover:to-indigo-400 text-black font-extrabold text-xs uppercase font-mono px-8 py-3 rounded-xl shadow-lg shadow-cyan-500/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
+            className="w-full sm:w-auto flex items-center justify-center gap-2.5 bg-pink-500 hover:bg-pink-600 text-white font-extrabold text-xs uppercase font-mono px-8 py-3 rounded-xl shadow-md shadow-pink-500/25 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
           >
             <Sparkles className="w-4 h-4 fill-current" />
             <span>{isProcessing ? 'Synthesizing...' : 'Reconstruct'}</span>
@@ -582,18 +582,18 @@ export default function DJStudioPage() {
 
         {/* PROCESSING PROGRESS */}
         {isProcessing && (
-          <div className="bg-[#0b0c13] border border-cyan-500/30 rounded-2xl p-5 space-y-3 animate-in fade-in">
-            <div className="flex justify-between text-[11px] font-mono text-cyan-300">
+          <div className="bg-zinc-50 border border-pink-200 rounded-2xl p-5 space-y-3 shadow-sm animate-in fade-in">
+            <div className="flex justify-between text-[11px] font-mono text-pink-600 font-bold">
               <span className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                <div className="w-2.5 h-2.5 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
                 <span>{RECONSTRUCTION_STAGES[currentStageIdx].label}</span>
               </span>
               <span>{progressPercent}%</span>
             </div>
-            <div className="h-1.5 bg-black/60 rounded-full overflow-hidden">
+            <div className="h-1.5 bg-zinc-200 rounded-full overflow-hidden">
               <div
                 style={{ width: `${progressPercent}%` }}
-                className="h-full bg-cyan-400 transition-all duration-300"
+                className="h-full bg-pink-500 transition-all duration-300"
               />
             </div>
           </div>
@@ -602,7 +602,7 @@ export default function DJStudioPage() {
         {/* SECTION 3: 3 Reconstructed Options (Audition Bar) */}
         {mashupReady && (
           <section id="previews-section" className="space-y-4 pt-2 animate-in fade-in duration-300">
-            <div className="flex items-center justify-between text-xs font-mono text-slate-400 px-1">
+            <div className="flex items-center justify-between text-xs font-mono text-zinc-500 px-1">
               <span>PREVIEW AUDITIONS (15s)</span>
               <span>SELECT TO LOAD MASTER</span>
             </div>
@@ -610,7 +610,7 @@ export default function DJStudioPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {[
                 { id: 1, title: '01 • VIP Anthem Drop', label: 'Lead Vocal Lock' },
-                { id: 2, title: '02 • Call & Response', label: 'Vocal Gap Surgery' },
+                { id: 2, title: '02 • Call & Response', label: 'Gap Surgeon' },
                 { id: 3, title: '03 • Harmonic Pivot', label: 'Key Blend 9A' },
               ].map((opt) => {
                 const isPlaying = playingPreviewId === opt.id;
@@ -619,34 +619,34 @@ export default function DJStudioPage() {
                 return (
                   <div
                     key={opt.id}
-                    className={`bg-[#0c0d15] border rounded-2xl p-4 flex flex-col justify-between space-y-3 transition-all ${
+                    className={`bg-zinc-50 border rounded-2xl p-4 flex flex-col justify-between space-y-3 transition-all ${
                       isSelected
-                        ? 'border-cyan-400 ring-1 ring-cyan-400/50 bg-[#0f111c]'
-                        : 'border-white/[0.06] hover:border-white/20'
+                        ? 'border-pink-500 ring-2 ring-pink-500/20 bg-pink-50/20 shadow-md'
+                        : 'border-zinc-200/80 hover:border-zinc-300 shadow-sm'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-white">{opt.title}</span>
-                      <span className="text-[9px] font-mono text-cyan-400/80 bg-cyan-950/40 px-2 py-0.5 rounded">
+                      <span className="text-xs font-bold text-zinc-900">{opt.title}</span>
+                      <span className="text-[9px] font-mono text-pink-600 bg-pink-100/60 px-2 py-0.5 rounded">
                         {opt.label}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-3 bg-[#080910] p-2.5 rounded-xl border border-white/[0.04]">
+                    <div className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-zinc-200/80 shadow-xs">
                       <button
                         type="button"
                         onClick={() => handleTogglePreviewPlay(opt.id)}
                         className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
                           isPlaying
-                            ? 'bg-rose-500 text-white'
-                            : 'bg-cyan-400 text-black hover:bg-cyan-300'
+                            ? 'bg-zinc-900 text-white'
+                            : 'bg-pink-500 text-white hover:bg-pink-600 shadow-sm'
                         }`}
                       >
                         {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
                       </button>
 
                       <div className="flex-1 space-y-1">
-                        <div className="flex justify-between text-[10px] font-mono text-slate-400">
+                        <div className="flex justify-between text-[10px] font-mono text-zinc-500">
                           <span>{isPlaying ? `${previewProgress.toFixed(1)}s` : '0.0s'}</span>
                           <span>15.0s</span>
                         </div>
@@ -656,7 +656,7 @@ export default function DJStudioPage() {
                               key={i}
                               style={{ height: `${(i % 4 + 1) * 25}%` }}
                               className={`flex-1 rounded-sm ${
-                                isPlaying && (i / 16) * 15 <= previewProgress ? 'bg-cyan-400' : 'bg-white/10'
+                                isPlaying && (i / 16) * 15 <= previewProgress ? 'bg-pink-500' : 'bg-zinc-200'
                               }`}
                             />
                           ))}
@@ -667,9 +667,9 @@ export default function DJStudioPage() {
                     <button
                       type="button"
                       onClick={() => handleMakeFullSong(opt.id, cutToTheChase ? 30 : 60)}
-                      className="w-full py-2 rounded-xl text-[11px] font-mono font-bold uppercase tracking-wider bg-white/[0.06] hover:bg-cyan-400 hover:text-black text-slate-200 transition-colors"
+                      className="w-full py-2 rounded-xl text-[11px] font-mono font-bold uppercase tracking-wider bg-white hover:bg-pink-500 hover:text-white text-zinc-800 border border-zinc-200 transition-colors shadow-xs"
                     >
-                      Load Full Master →
+                      Load Master →
                     </button>
                   </div>
                 );
@@ -678,34 +678,34 @@ export default function DJStudioPage() {
           </section>
         )}
 
-        {/* SECTION 4: Master NLE Timeline & Studio Player */}
+        {/* SECTION 4: Master NLE Timeline & Studio Player (Light Mode Pink Theme) */}
         {fullSongReady && (
-          <section id="full-player-section" className="bg-[#0b0c13] border border-white/[0.08] rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl animate-in fade-in duration-300">
+          <section id="full-player-section" className="bg-zinc-50 border border-zinc-200/90 rounded-3xl p-6 sm:p-8 space-y-6 shadow-md animate-in fade-in duration-300">
             
             {/* Top Status & Controls Toolbar */}
-            <div className="flex items-center justify-between flex-wrap gap-4 border-b border-white/[0.06] pb-4">
+            <div className="flex items-center justify-between flex-wrap gap-4 border-b border-zinc-200/80 pb-4">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-cyan-400/10 text-cyan-400 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center">
                   <Check className="w-4 h-4" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-white uppercase tracking-wider">
+                    <span className="text-sm font-bold text-zinc-900 uppercase tracking-wider">
                       MASTER V{refinementVersion}
                     </span>
                     {isMasteredRefined && (
-                      <span className="text-[9px] font-mono text-amber-300 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/30">
-                        FEEDBACK CORRECTED
+                      <span className="text-[9px] font-mono text-pink-600 bg-pink-100 px-2 py-0.5 rounded-md border border-pink-200">
+                        FEEDBACK REFINED
                       </span>
                     )}
                   </div>
-                  <span className="text-[11px] font-mono text-slate-400">
+                  <span className="text-[11px] font-mono text-zinc-500">
                     {trackDurationSec}s Total • Commercial -0.2 dB True Peak
                   </span>
                 </div>
               </div>
 
-              {/* Minimal Icon Action Buttons */}
+              {/* Minimal Action Buttons */}
               <div className="flex items-center gap-2">
                 
                 {/* Extend +1 Min */}
@@ -713,10 +713,10 @@ export default function DJStudioPage() {
                   type="button"
                   onClick={handleInfiniteExtendOneMin}
                   disabled={isExtending || isRefining}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-mono text-slate-300 transition-colors disabled:opacity-40"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-xs font-mono text-zinc-700 shadow-xs transition-colors disabled:opacity-40"
                   title="Extend track by +1 minute"
                 >
-                  <Plus className="w-3.5 h-3.5 text-purple-400" />
+                  <Plus className="w-3.5 h-3.5 text-pink-500" />
                   <span>+1 Min</span>
                 </button>
 
@@ -725,7 +725,7 @@ export default function DJStudioPage() {
                   type="button"
                   onClick={handleRefineAndMaster}
                   disabled={isRefining || isExtending}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-400/20 to-rose-500/20 hover:from-amber-400/30 hover:to-rose-500/30 border border-amber-400/40 text-amber-300 text-xs font-mono font-bold transition-all disabled:opacity-40"
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-pink-50 hover:bg-pink-100 border border-pink-200 text-pink-600 text-xs font-mono font-bold shadow-xs transition-all disabled:opacity-40"
                   title="Regenerate improved version from your feedback & restart playback from 0.0s"
                 >
                   <Wand2 className="w-3.5 h-3.5" />
@@ -737,10 +737,10 @@ export default function DJStudioPage() {
                   type="button"
                   onClick={handleExportCustomRegion}
                   disabled={isExportingRegion}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-xs font-mono text-slate-300 transition-colors disabled:opacity-40"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-xs font-mono text-zinc-700 shadow-xs transition-colors disabled:opacity-40"
                   title={`Export highlighted region (${regionDuration.toFixed(1)}s)`}
                 >
-                  <Scissors className="w-3.5 h-3.5 text-cyan-400" />
+                  <Scissors className="w-3.5 h-3.5 text-pink-500" />
                   <span>Clip ({regionDuration.toFixed(1)}s)</span>
                 </button>
 
@@ -749,7 +749,7 @@ export default function DJStudioPage() {
                   type="button"
                   onClick={handleDownloadMp3}
                   disabled={isDownloading}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-black font-extrabold text-xs font-mono uppercase tracking-wider shadow-md shadow-cyan-400/20 transition-all disabled:opacity-40"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-pink-500 hover:bg-pink-600 text-white font-extrabold text-xs font-mono uppercase tracking-wider shadow-md shadow-pink-500/25 transition-all disabled:opacity-40"
                   title="Download full mastered MP3"
                 >
                   <Download className="w-3.5 h-3.5" />
@@ -759,10 +759,10 @@ export default function DJStudioPage() {
               </div>
             </div>
 
-            {/* FULL-WIDTH NLE TIMELINE WAVEFORM */}
+            {/* FULL-WIDTH NLE TIMELINE WAVEFORM (LIGHT MODE PINK) */}
             <div className="space-y-3">
-              <div className="flex justify-between text-[11px] font-mono text-slate-400">
-                <span className="text-cyan-400 font-bold">{fullProgress.toFixed(1)}s</span>
+              <div className="flex justify-between text-[11px] font-mono text-zinc-500">
+                <span className="text-pink-600 font-bold">{fullProgress.toFixed(1)}s</span>
                 <span>{Math.floor(trackDurationSec / 60)}:{(trackDurationSec % 60).toString().padStart(2, '0')}</span>
               </div>
 
@@ -770,30 +770,30 @@ export default function DJStudioPage() {
               <div
                 ref={waveformRef}
                 onClick={handleScrubberSeek}
-                className="h-28 bg-[#07080e] rounded-2xl p-3 flex items-end gap-1 cursor-pointer overflow-hidden relative border border-white/[0.04] hover:border-white/10 transition-colors select-none"
+                className="h-28 bg-white rounded-2xl p-3 flex items-end gap-1 cursor-pointer overflow-hidden relative border border-zinc-200 shadow-inner transition-colors select-none"
                 title="Click or drag to scrub playhead"
               >
-                {/* SUBTLE TRANSLUCENT REGION HIGHLIGHT OVERLAY */}
+                {/* SUBTLE TRANSLUCENT PASTEL PINK REGION HIGHLIGHT OVERLAY */}
                 <div
                   style={{
                     left: `${(regionStartSec / trackDurationSec) * 100}%`,
                     width: `${((regionEndSec - regionStartSec) / trackDurationSec) * 100}%`,
                   }}
-                  className="absolute top-0 bottom-0 bg-white/[0.07] border-x border-cyan-400/60 pointer-events-none z-10 backdrop-blur-[1px]"
+                  className="absolute top-0 bottom-0 bg-pink-500/15 border-x-2 border-pink-500/80 pointer-events-none z-10"
                 />
 
                 {/* Scrub Playhead */}
                 <div
                   style={{ left: `${(fullProgress / trackDurationSec) * 100}%` }}
-                  className="absolute top-0 bottom-0 w-0.5 bg-cyan-400 shadow-lg shadow-cyan-400 z-20 pointer-events-none"
+                  className="absolute top-0 bottom-0 w-0.5 bg-zinc-900 z-20 pointer-events-none"
                 >
-                  <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 -translate-x-1/2 -translate-y-1/2" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-pink-500 -translate-x-1/2 -translate-y-1/2 shadow-sm" />
                 </div>
 
                 {/* Drop Marker Flag */}
                 <div
                   style={{ left: `${(blueprint.dropTime / trackDurationSec) * 100}%` }}
-                  className="absolute top-2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[8px] font-mono bg-rose-500/80 text-white font-bold tracking-wider z-10"
+                  className="absolute top-2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[8px] font-mono bg-pink-500 text-white font-bold tracking-wider z-10 shadow-xs"
                 >
                   DROP ({blueprint.dropTime}s)
                 </div>
@@ -809,21 +809,21 @@ export default function DJStudioPage() {
                       style={{ height: `${isDrop ? 75 + (i % 4) * 6 : 25 + (i % 5) * 8}%` }}
                       className={`flex-1 rounded-sm transition-colors ${
                         isPast
-                          ? isDrop ? 'bg-gradient-to-t from-rose-500 to-amber-300' : 'bg-cyan-400'
-                          : 'bg-white/[0.08] hover:bg-white/20'
+                          ? isDrop ? 'bg-pink-500' : 'bg-pink-400'
+                          : 'bg-zinc-200 hover:bg-zinc-300'
                       }`}
                     />
                   );
                 })}
               </div>
 
-              {/* Region Marker Setting Buttons */}
-              <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 pt-1">
+              {/* Region Marker Setting Buttons & Floating Actions */}
+              <div className="flex items-center justify-between text-[11px] font-mono text-zinc-500 pt-1">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={handleSetRegionStart}
-                    className="hover:text-cyan-300 transition-colors"
+                    className="hover:text-pink-600 transition-colors"
                   >
                     [ Mark Start ({regionStartSec.toFixed(1)}s)
                   </button>
@@ -831,33 +831,33 @@ export default function DJStudioPage() {
                   <button
                     type="button"
                     onClick={handleSetRegionEnd}
-                    className="hover:text-cyan-300 transition-colors"
+                    className="hover:text-pink-600 transition-colors"
                   >
                     Mark End ({regionEndSec.toFixed(1)}s) ]
                   </button>
                 </div>
 
-                {/* FLOATING CIRCULAR FEEDBACK BUTTONS */}
-                <div className="flex items-center gap-2">
+                {/* FLOATING CIRCULAR FEEDBACK BUTTONS (SOFT DROP SHADOW) */}
+                <div className="flex items-center gap-2.5">
                   
                   {/* Hype Flame Button */}
                   <button
                     type="button"
                     onClick={handleHypeTap}
-                    className="w-8 h-8 rounded-full bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 border border-rose-500/30 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+                    className="w-9 h-9 rounded-full bg-white hover:bg-pink-50 text-pink-500 border border-zinc-200 flex items-center justify-center shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-95 transition-all"
                     title={`Hype this moment (+1 score). Tally: ${hypeTaps.length}`}
                   >
-                    <Flame className="w-4 h-4 fill-current" />
+                    <Flame className="w-4 h-4 fill-current text-pink-500" />
                   </button>
 
                   {/* Cold Freeze Button */}
                   <button
                     type="button"
                     onClick={handleColdTap}
-                    className="w-8 h-8 rounded-full bg-cyan-500/20 hover:bg-cyan-500/40 text-cyan-300 border border-cyan-500/30 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+                    className="w-9 h-9 rounded-full bg-white hover:bg-zinc-100 text-zinc-500 border border-zinc-200 flex items-center justify-center shadow-md hover:shadow-lg hover:-translate-y-0.5 active:scale-95 transition-all"
                     title={`Cold / Dislike this transition (-1 score). Tally: ${negativeTaps.length}`}
                   >
-                    <Snowflake className="w-4 h-4" />
+                    <Snowflake className="w-4 h-4 text-zinc-500" />
                   </button>
 
                 </div>
@@ -869,10 +869,10 @@ export default function DJStudioPage() {
               <button
                 type="button"
                 onClick={handleToggleFullPlay}
-                className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-lg ${
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-md ${
                   isPlayingFull
-                    ? 'bg-rose-500 text-white shadow-rose-500/30'
-                    : 'bg-cyan-400 text-black hover:bg-cyan-300 shadow-cyan-400/30'
+                    ? 'bg-zinc-900 text-white'
+                    : 'bg-pink-500 text-white hover:bg-pink-600 shadow-pink-500/25'
                 }`}
                 title={isPlayingFull ? 'Pause' : 'Play'}
               >
@@ -880,7 +880,7 @@ export default function DJStudioPage() {
               </button>
 
               {refineActions.length > 0 && (
-                <span className="text-[10px] font-mono text-amber-400/90 truncate max-w-md">
+                <span className="text-[10px] font-mono text-pink-600 truncate max-w-md">
                   ✓ {refineActions[0]}
                 </span>
               )}
@@ -892,7 +892,7 @@ export default function DJStudioPage() {
       </main>
 
       {/* Ultra-Clean Footer */}
-      <footer className="border-t border-white/[0.04] py-4 px-6 text-center text-[10px] font-mono text-slate-600">
+      <footer className="border-t border-zinc-100 py-4 px-6 text-center text-[10px] font-mono text-zinc-400">
         BAMBATA 2.0 // DSP ENGINE
       </footer>
 

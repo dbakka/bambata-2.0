@@ -1,12 +1,10 @@
 """BAMBATA 2.0 - Spotify Pedalboard Transition Renderer & Surgical Anti-Clash DSP.
 
 Features:
-1. High-Fidelity Vocal Gating:
-   - NoiseGate(threshold_db=-35.0, ratio=4.0, release_ms=150) on Hero Vocal stem.
-2. Dynamic Anti-Clash Notch Carving:
-   - PeakFilter(cutoff_frequency_hz=1500.0, q=2.0, gain_db=-6.0) on Track B melody stem.
-3. Formant-Preserved Pitch Shifting (pyrubberband formants=True).
-4. Spectral Vocal Sidechain Ducking (-4.5dB).
+1. "Kill the Beat" Vocal Filter (250Hz Highpass + -25dB NoiseGate).
+2. Deterministic Vocal Gap Surgeon (RMS envelope masking).
+3. Dynamic Anti-Clash Notch Carving (PeakFilter 1500Hz, Q=2.0, -6.0dB).
+4. Formant-Preserved Pitch Shifting.
 5. Master Bus Glue (-0.2dB true peak limiter).
 6. Region Slicing & Export (10ms cosine anti-pop fades).
 """
@@ -16,6 +14,7 @@ import numpy as np
 import soundfile as sf
 from pathlib import Path
 from scipy import signal
+from app.services.gap_surgeon import apply_vocal_gap_mask
 
 logger = logging.getLogger("bambata.transition_renderer")
 
@@ -43,16 +42,18 @@ except ImportError:
     HAS_PYRUBBERBAND = False
 
 
-def apply_high_fidelity_vocal_gate(
+def apply_kill_the_beat_vocal_filter(
     vocal_audio: np.ndarray,
     sample_rate: int = 44100,
-    threshold_db: float = -35.0,
-    ratio: float = 4.0,
-    release_ms: float = 150.0
+    cutoff_hz: float = 250.0,
+    gate_threshold_db: float = -25.0,
+    gate_ratio: float = 10.0,
+    gate_release_ms: float = 50.0
 ) -> np.ndarray:
     """
-    Applies strict Noise Gating to Track A's Hero Vocal.
-    Ensures 100% digital silence during vocal breaks, removing breathing artifacts & bleed.
+    "Kill the Beat" Vocal Filter:
+    1. 250Hz HighpassFilter -> Completely deletes kicks, basslines, and log drums from vocal stem.
+    2. Strict NoiseGate(-25dB, ratio=10.0, release=50ms) -> Snaps audio to digital 0.0 silence.
     """
     if len(vocal_audio) == 0:
         return vocal_audio
@@ -63,31 +64,51 @@ def apply_high_fidelity_vocal_gate(
     if HAS_PEDALBOARD:
         try:
             board = Pedalboard([
-                HighpassFilter(cutoff_frequency_hz=120.0),
+                HighpassFilter(cutoff_frequency_hz=cutoff_hz),
                 NoiseGate(
-                    threshold_db=threshold_db,
-                    ratio=ratio,
-                    release_ms_ratio=release_ms
-                ) if hasattr(NoiseGate, 'release_ms_ratio') else NoiseGate(threshold_db=threshold_db, ratio=ratio)
+                    threshold_db=gate_threshold_db,
+                    ratio=gate_ratio,
+                    release_ms_ratio=gate_release_ms
+                ) if hasattr(NoiseGate, 'release_ms_ratio') else NoiseGate(threshold_db=gate_threshold_db, ratio=gate_ratio)
             ])
             processed = board(vocal_audio.T.astype(np.float32), sample_rate).T
             return processed.astype(np.float32)
         except Exception as e:
-            logger.warning(f"Pedalboard NoiseGate failed: {e}. Using smooth envelope gate.")
+            logger.warning(f"Pedalboard 'Kill the Beat' gate failed: {e}. Using scipy/numpy chain.")
 
-    mono = np.mean(vocal_audio, axis=1)
-    frame_len = int(0.010 * sample_rate)
+    sos_high = signal.butter(6, cutoff_hz, 'highpass', fs=sample_rate, output='sos')
+    filtered = signal.sosfilt(sos_high, vocal_audio, axis=0)
+
+    mono = np.mean(filtered, axis=1)
+    frame_len = max(2, int(0.005 * sample_rate))
     kernel = np.ones(frame_len) / frame_len
     rms = np.sqrt(np.convolve(mono ** 2, kernel, mode='same'))
 
-    thresh_lin = 10.0 ** (threshold_db / 20.0)
+    thresh_lin = 10.0 ** (gate_threshold_db / 20.0)
     gate_mask = np.where(rms >= thresh_lin, 1.0, 0.0)
 
-    release_samples = int((release_ms / 1000.0) * sample_rate)
+    release_samples = max(2, int((gate_release_ms / 1000.0) * sample_rate))
     smoothed_gate = np.convolve(gate_mask, np.ones(release_samples) / release_samples, mode='same')
-    smoothed_gate = np.clip(smoothed_gate * ratio, 0.0, 1.0)[:, np.newaxis]
+    smoothed_gate = np.clip(smoothed_gate * gate_ratio, 0.0, 1.0)[:, np.newaxis]
 
-    return (vocal_audio * smoothed_gate).astype(np.float32)
+    return (filtered * smoothed_gate).astype(np.float32)
+
+
+def apply_high_fidelity_vocal_gate(
+    vocal_audio: np.ndarray,
+    sample_rate: int = 44100,
+    threshold_db: float = -25.0,
+    ratio: float = 10.0,
+    release_ms: float = 50.0
+) -> np.ndarray:
+    return apply_kill_the_beat_vocal_filter(
+        vocal_audio=vocal_audio,
+        sample_rate=sample_rate,
+        cutoff_hz=250.0,
+        gate_threshold_db=threshold_db,
+        gate_ratio=ratio,
+        gate_release_ms=release_ms
+    )
 
 
 def apply_anti_clash_vocal_notch(
@@ -98,10 +119,6 @@ def apply_anti_clash_vocal_notch(
     q: float = 2.0,
     gain_db: float = -6.0
 ) -> np.ndarray:
-    """
-    Applies a sharp 1.5kHz Peaking Notch Filter (-6.0dB, Q=2.0) on Track B's mid-range melody.
-    Carves out the human vocal presence pocket, eliminating clashing with Track A's Hero Vocal.
-    """
     if len(track_b_melody) == 0 or not hero_vocal_active:
         return track_b_melody
 
@@ -143,7 +160,6 @@ def slice_and_export_region(
     sample_rate: int = 44100,
     fade_ms: float = 10.0
 ) -> np.ndarray:
-    """Slices audio array with 10ms cosine fade-in/out to prevent pops and clicks."""
     if len(audio) == 0:
         return audio
 
