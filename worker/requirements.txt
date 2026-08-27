@@ -1,0 +1,13 @@
+# BAMBATA 2.0 Serverless GPU Worker Dependencies
+torch>=2.1.0
+torchaudio>=2.1.0
+demucs>=4.0.1
+pyrubberband>=0.3.0
+soundfile>=0.12.1
+scipy>=1.11.0
+numpy>=1.24.0
+modal>=0.62.0
+runpod>=1.6.0
+pydub>=0.25.1
+ffmpeg-python>=0.2.0
+requests>=2.31.0
