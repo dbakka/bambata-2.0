@@ -1,10 +1,10 @@
-"""BAMBATA 2.0 - Spotify Pedalboard Transition Renderer & Surgical Anti-Clash DSP.
+"""BAMBATA 2.0 - Spotify Pedalboard Transition Renderer & Precision Harmonic Key-Lock Engine.
 
 Features:
-1. "Kill the Beat" Vocal Filter (250Hz Highpass + -25dB NoiseGate).
-2. Deterministic Vocal Gap Surgeon (RMS envelope masking).
-3. Dynamic Anti-Clash Notch Carving (PeakFilter 1500Hz, Q=2.0, -6.0dB).
-4. Formant-Preserved Pitch Shifting.
+1. Precision Harmonic Key-Lock Engine (formant-preserved pyrubberband transposition into optimal Pivot Key).
+2. Enhanced VAD Spectral Flux Gap Surgeon (percussion-free pocket detection).
+3. "Kill the Beat" Vocal Filter (250Hz Highpass + -25dB NoiseGate).
+4. Dynamic Anti-Clash Notch Carving (PeakFilter 1500Hz, Q=2.0, -6.0dB).
 5. Master Bus Glue (-0.2dB true peak limiter).
 6. Region Slicing & Export (10ms cosine anti-pop fades).
 """
@@ -14,6 +14,8 @@ import numpy as np
 import soundfile as sf
 from pathlib import Path
 from scipy import signal
+
+from app.services.harmonic_math import calculate_optimal_pivot_key, normalize_to_camelot
 from app.services.gap_surgeon import apply_vocal_gap_mask
 
 logger = logging.getLogger("bambata.transition_renderer")
@@ -40,6 +42,83 @@ try:
     HAS_PYRUBBERBAND = True
 except ImportError:
     HAS_PYRUBBERBAND = False
+
+
+def apply_formant_preserved_pitch_shift(
+    audio: np.ndarray,
+    sample_rate: int,
+    semitones: float,
+    is_vocal: bool = False
+) -> np.ndarray:
+    """
+    Applies high-quality pitch shift with formant preservation for vocals,
+    ensuring zero chipmunk distortion and clean harmonic lock.
+    """
+    if abs(semitones) < 0.05 or len(audio) == 0:
+        return audio
+
+    if HAS_PYRUBBERBAND:
+        try:
+            return pyrb.pitch_shift(audio, sample_rate, n_steps=semitones, formants=is_vocal).astype(np.float32)
+        except Exception as e:
+            logger.warning(f"pyrubberband pitch shift failed: {e}. Using high-quality windowed resample fallback.")
+
+    ratio = 2.0 ** (semitones / 12.0)
+    num_samples = int(len(audio) / ratio)
+    resampled = signal.resample(audio, num_samples)
+    return signal.resample(resampled, len(audio)).astype(np.float32)
+
+
+def apply_precision_harmonic_key_lock(
+    track_a_stems: Dict[str, np.ndarray],
+    track_b_stems: Dict[str, np.ndarray],
+    key_a: str,
+    key_b: str,
+    sample_rate: int = 44100
+) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray], Dict[str, Any]]:
+    """
+    Precision Harmonic Key-Lock:
+    Calculates the optimal intermediate Pivot Key and transposes both tracks simultaneously.
+    Vocals use formant-preserved shifting to eliminate chipmunk artifacts.
+    """
+    pivot_info = calculate_optimal_pivot_key(key_a, key_b)
+    shift_a = pivot_info.get("shift_a_semitones", 0.0)
+    shift_b = pivot_info.get("shift_b_semitones", 0.0)
+    pivot_camelot = pivot_info.get("pivot_camelot", "8A")
+
+    logger.info(
+        f"Harmonic Key-Lock active: Locking Track A ({key_a} -> {shift_a:+.1f}st) "
+        f"and Track B ({key_b} -> {shift_b:+.1f}st) into Pivot Key {pivot_camelot}."
+    )
+
+    locked_stems_a = {}
+    for stem_name, stem_audio in track_a_stems.items():
+        if stem_name == "Drums":
+            # Avoid shifting unpitched drum transients
+            locked_stems_a[stem_name] = stem_audio
+        else:
+            is_voc = (stem_name == "Vocals")
+            locked_stems_a[stem_name] = apply_formant_preserved_pitch_shift(
+                audio=stem_audio,
+                sample_rate=sample_rate,
+                semitones=shift_a,
+                is_vocal=is_voc
+            )
+
+    locked_stems_b = {}
+    for stem_name, stem_audio in track_b_stems.items():
+        if stem_name == "Drums":
+            locked_stems_b[stem_name] = stem_audio
+        else:
+            is_voc = (stem_name == "Vocals")
+            locked_stems_b[stem_name] = apply_formant_preserved_pitch_shift(
+                audio=stem_audio,
+                sample_rate=sample_rate,
+                semitones=shift_b,
+                is_vocal=is_voc
+            )
+
+    return locked_stems_a, locked_stems_b, pivot_info
 
 
 def apply_kill_the_beat_vocal_filter(
@@ -190,60 +269,6 @@ def slice_and_export_region(
         clipped[-fade_samples:] *= fade_out
 
     return clipped.astype(np.float32)
-
-
-def apply_formant_preserved_pitch_shift(
-    audio: np.ndarray,
-    sample_rate: int,
-    semitones: float
-) -> np.ndarray:
-    if abs(semitones) < 0.05:
-        return audio
-
-    if HAS_PYRUBBERBAND:
-        try:
-            return pyrb.pitch_shift(audio, sample_rate, n_steps=semitones, formants=True)
-        except Exception as e:
-            logger.warning(f"pyrubberband pitch shift failed: {e}. Using resample fallback.")
-
-    ratio = 2.0 ** (semitones / 12.0)
-    num_samples = int(len(audio) / ratio)
-    resampled = signal.resample(audio, num_samples)
-    return signal.resample(resampled, len(audio)).astype(np.float32)
-
-
-def apply_spectral_vocal_ducking(
-    vocal_stem: np.ndarray,
-    melody_stem: np.ndarray,
-    sample_rate: int = 44100,
-    duck_amount_db: float = -4.5
-) -> np.ndarray:
-    if len(vocal_stem) == 0 or len(melody_stem) == 0:
-        return melody_stem
-
-    v_mono = vocal_stem.mean(axis=1) if vocal_stem.ndim > 1 else vocal_stem
-    min_len = min(len(vocal_stem), len(melody_stem))
-    v_mono = v_mono[:min_len]
-
-    frame_size = int(0.020 * sample_rate)
-    v_sq = v_mono ** 2
-    if len(v_sq) < frame_size:
-        return melody_stem
-
-    kernel = np.ones(frame_size) / frame_size
-    v_rms = np.sqrt(np.convolve(v_sq, kernel, mode='same'))
-
-    v_active = np.clip((v_rms - 0.03) / 0.12, 0.0, 1.0)
-    gain_ducked = 10.0 ** (duck_amount_db / 20.0)
-    gain_curve = 1.0 - (v_active * (1.0 - gain_ducked))
-
-    ducked_melody = np.copy(melody_stem[:min_len])
-    if ducked_melody.ndim > 1:
-        ducked_melody *= gain_curve[:, np.newaxis]
-    else:
-        ducked_melody *= gain_curve
-
-    return ducked_melody.astype(np.float32)
 
 
 def weld_audio(

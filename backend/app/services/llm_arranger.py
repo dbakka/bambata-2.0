@@ -1,9 +1,11 @@
-"""BAMBATA 2.0 - Zero-Reference Generative Arranger with Deterministic Gap Surgeon Handoff.
+"""BAMBATA 2.0 - Zero-Reference Generative Arranger with YouTube Style-Transfer & Harmonic Key-Lock.
 
 LLM HANDOFF DIRECTIVES:
-1. Default Deck Architecture: Deck A is the sole "Hero Vocal & Harmonic Source". Deck B is the pure "Groove & Sub-Bass Anchor".
-2. Deterministic Gap Surgeon Handoff: Do not attempt to micro-chop the vocals to fit into gaps. Simply output a single, continuous block where you want the vocal to generally play (e.g., 'Verse'). The backend `gap_surgeon.py` will automatically mute and unmute the vocal to weave it perfectly between Track B's beats.
-3. Absolute Zero-Tolerance for Vocal Overlap: Track B's vocal stem is set to 0.0 whenever Deck A's Hero Vocal is active.
+1. YouTube Style-Transfer Blueprint: Molds arrangement directly to match reference DNA (e.g. Dlala Thukzin Afrohouse or Amapiano log drum drops).
+2. Default Deck Architecture: Deck A is the sole "Hero Vocal & Harmonic Source". Deck B is the pure "Groove & Sub-Bass Anchor".
+3. Precision Harmonic Key-Lock: Both tracks are locked into optimal Pivot Key via formant-preserved pitch shifting.
+4. Enhanced VAD Gap-Placement: Do not attempt to micro-chop vocals. Output continuous blocks; Python gap_surgeon.py uses spectral flux to duck vocals around beats.
+5. Absolute Zero-Tolerance for Vocal Overlap: Track B's vocal stem is 0.0 whenever Deck A's Hero Vocal is active.
 """
 import json
 import logging
@@ -11,6 +13,7 @@ from typing import Dict, Any, List, Optional
 from app.services.phrase_aligner import PhraseGrid
 from app.services.harmonic_math import calculate_optimal_pivot_key
 from app.services.cleanup_dsp import score_arrangement_blocks_with_feedback
+from app.services.style_transfer import style_transfer_engine
 
 logger = logging.getLogger("bambata.llm_arranger")
 
@@ -29,14 +32,24 @@ class LLMArranger:
         cut_to_the_chase: bool = False
     ) -> Dict[str, Any]:
         """
-        Generates continuous arrangement blocks and delegates micro-chopping to gap_surgeon.py.
+        Generates continuous arrangement blocks guided by YouTube Style-Transfer Blueprint.
         """
         grid = PhraseGrid(bpm=bpm)
         key_a = track_a_meta.get("key", "8A")
         key_b = track_b_meta.get("key", "10A")
         pivot_data = calculate_optimal_pivot_key(key_a, key_b)
 
-        # 1. "CUT TO THE CHASE" MACRO EXECUTION
+        # 1. Fetch or Match YouTube Style-Transfer Reference DNA
+        yt_url = reference_meta.get("youtube_url") if reference_meta else None
+        style_dna = style_transfer_engine.extract_or_match_reference_dna(
+            youtube_url=yt_url,
+            bpm_a=track_a_meta.get("bpm", bpm),
+            bpm_b=track_b_meta.get("bpm", bpm),
+            key_a=key_a,
+            key_b=key_b
+        )
+
+        # 2. "CUT TO THE CHASE" MACRO EXECUTION
         if cut_to_the_chase:
             logger.info("Executing 'Cut to the Chase' macro: jumping straight to 4-bar pre-drop build + main drop.")
             build_bars = 4
@@ -50,7 +63,7 @@ class LLMArranger:
             s1_ms = grid.bars_to_ms(build_bars)
             blocks.append({
                 "stage_id": 1,
-                "block_name": "Stage 1: Rapid 4-Bar Pre-Drop Tension",
+                "block_name": f"Stage 1: Rapid 4-Bar Pre-Drop Tension ({style_dna.get('style_genre', 'Club VIP')})",
                 "start_ms": current_ms,
                 "end_ms": current_ms + s1_ms,
                 "bars": build_bars,
@@ -59,8 +72,9 @@ class LLMArranger:
                     "deck_b_role": "Groove & Rhythm Source (Track B Snare Roll)"
                 },
                 "dsp_directives": {
+                    "harmonic_key_lock": f"Locked to Pivot Key {pivot_data['pivot_camelot']}",
                     "kill_the_beat_filter": "Highpass(250Hz) + NoiseGate(-25dB, release=50ms)",
-                    "gap_surgeon": "Deterministic numpy RMS masking active"
+                    "gap_surgeon": "Enhanced VAD Spectral Flux active"
                 },
                 "pre_drop_silence_gap_ms": grid.bars_to_ms(1),
                 "stem_levels_track_a": {"Vocals": 0.95, "Melody": 0.4, "Bass": 0.0, "Drums": 0.0},
@@ -72,17 +86,18 @@ class LLMArranger:
             s2_ms = grid.bars_to_ms(drop_bars)
             blocks.append({
                 "stage_id": 2,
-                "block_name": "Stage 2: Instant Peak Drop",
+                "block_name": f"Stage 2: Instant Peak Drop ({style_dna.get('title', 'Peak Drop')})",
                 "start_ms": current_ms,
                 "end_ms": current_ms + s2_ms,
                 "bars": drop_bars,
                 "deck_architecture": {
                     "deck_a_role": "Track A Continuous Hero Vocal",
-                    "deck_b_role": "Track B Pure Instrumental Groove (4/4 Kick & Sub-Bass)"
+                    "deck_b_role": f"Track B {style_dna.get('percussion_groove_type', '4/4 Kick & Sub-Bass')}"
                 },
                 "dsp_directives": {
+                    "harmonic_key_lock": f"Locked to Pivot Key {pivot_data['pivot_camelot']}",
                     "kill_the_beat_filter": "Highpass(250Hz) + NoiseGate(-25dB, release=50ms)",
-                    "gap_surgeon": "Deterministic numpy RMS masking active"
+                    "gap_surgeon": "Enhanced VAD Spectral Flux active"
                 },
                 "stem_levels_track_a": {"Vocals": 1.35, "Melody": 0.45, "Bass": 0.0, "Drums": 0.0},
                 "stem_levels_track_b": {"Vocals": 0.0, "Melody": 0.2, "Bass": 1.0, "Drums": 1.0}
@@ -106,28 +121,28 @@ class LLMArranger:
             })
 
             return {
-                "mode": "DETERMINISTIC_GAP_SURGERY_CUT_TO_THE_CHASE",
+                "mode": "STYLE_TRANSFER_CUT_TO_THE_CHASE",
                 "bpm": bpm,
                 "cut_to_the_chase": True,
+                "style_transfer_dna": style_dna,
+                "precision_harmonic_key_lock": pivot_data,
                 "dsp_pipeline": {
+                    "harmonic_key_lock": f"Locked to Pivot Key {pivot_data['pivot_camelot']} (Track A: {pivot_data['shift_a_semitones']:+.1f}st, Track B: {pivot_data['shift_b_semitones']:+.1f}st)",
                     "vocal_filter": "HighpassFilter(250Hz) + NoiseGate(-25dB, ratio=10.0, release=50ms)",
-                    "gap_surgeon": "apply_vocal_gap_mask(10ms crossfade)",
+                    "gap_surgeon": "apply_vocal_gap_mask(Spectral Flux + 10ms crossfade)",
                     "anti_clash_notch": "PeakFilter(1500Hz, Q=2.0, -6dB)"
                 },
-                "pivot_key_data": pivot_data,
                 "total_duration_s": round((current_ms + s3_ms) / 1000.0, 1),
                 "arrangement_blocks": blocks
             }
 
-        # 2. STANDARD 5-STAGE RECORD
-        if duration_s <= 30.0:
-            intro_bars, verse_bars, build_bars, drop_bars, outro_bars = 2, 4, 4, 8, 2
-        elif duration_s <= 60.0:
-            intro_bars, verse_bars, build_bars, drop_bars, outro_bars = 4, 8, 4, 12, 4
-        elif duration_s <= 120.0:
-            intro_bars, verse_bars, build_bars, drop_bars, outro_bars = 8, 16, 8, 24, 8
-        else:
-            intro_bars, verse_bars, build_bars, drop_bars, outro_bars = 16, 32, 8, 32, 16
+        # 3. STANDARD STYLE-TRANSFER BLUEPRINT RECORD (Afrohouse / Amapiano / Club)
+        b_struct = style_dna.get("structure_blueprint", {})
+        intro_bars = b_struct.get("intro_bars", 4)
+        verse_bars = b_struct.get("verse_bars", 8)
+        build_bars = b_struct.get("build_bars", style_dna.get("build_bars", 8))
+        drop_bars = b_struct.get("drop_bars", 16)
+        outro_bars = b_struct.get("outro_bars", 4)
 
         current_ms = 0
         blocks = []
@@ -136,13 +151,13 @@ class LLMArranger:
         s1_ms = grid.bars_to_ms(intro_bars)
         blocks.append({
             "stage_id": 1,
-            "block_name": "Stage 1: Intro Groove",
+            "block_name": f"Stage 1: Intro Groove ({style_dna.get('style_genre', 'Afrohouse')})",
             "start_ms": current_ms,
             "end_ms": current_ms + s1_ms,
             "bars": intro_bars,
             "deck_architecture": {
                 "deck_a": "Gated Hero Vocal Tease",
-                "deck_b": "Filtered Drum Groove"
+                "deck_b": f"Filtered {style_dna.get('percussion_groove_type', 'Drum Groove')}"
             },
             "stem_levels_track_a": {"Vocals": 0.85, "Melody": 0.4, "Bass": 0.0, "Drums": 0.0},
             "stem_levels_track_b": {"Vocals": 0.0, "Melody": 0.2, "Bass": 0.0, "Drums": 0.75}
@@ -153,16 +168,16 @@ class LLMArranger:
         s2_ms = grid.bars_to_ms(verse_bars)
         blocks.append({
             "stage_id": 2,
-            "block_name": "Stage 2: Main Verse",
+            "block_name": "Stage 2: Main Storytelling Verse",
             "start_ms": current_ms,
             "end_ms": current_ms + s2_ms,
             "bars": verse_bars,
             "deck_architecture": {
                 "deck_a": "Sole Hero Storytelling Vocal (Continuous Block)",
-                "deck_b": "Driving Bassline & Solid Kick/Snare"
+                "deck_b": f"{style_dna.get('sub_bass_profile', 'Driving Bassline')} & Percussion"
             },
             "dsp_directives": {
-                "gap_surgeon": "Continuous vocal array passed to apply_vocal_gap_mask to duck around Track B beats"
+                "gap_surgeon": "Enhanced VAD Spectral Flux weaves vocal into Track B silence gaps"
             },
             "stem_levels_track_a": {"Vocals": 1.25, "Melody": 0.55, "Bass": 0.0, "Drums": 0.0},
             "stem_levels_track_b": {"Vocals": 0.0, "Melody": 0.2, "Bass": 0.85, "Drums": 0.95}
@@ -173,13 +188,13 @@ class LLMArranger:
         s3_ms = grid.bars_to_ms(build_bars)
         blocks.append({
             "stage_id": 3,
-            "block_name": "Stage 3: Buildup & Tension",
+            "block_name": f"Stage 3: {build_bars}-Bar Tension Riser ({style_dna.get('title', 'Buildup')})",
             "start_ms": current_ms,
             "end_ms": current_ms + s3_ms,
             "bars": build_bars,
             "deck_architecture": {
                 "deck_a": "Rising Hero Vocal Riser",
-                "deck_b": "Accelerating Snare Roll Riser"
+                "deck_b": "Accelerating Percussion & Snare Roll"
             },
             "pre_drop_silence_gap_ms": grid.bars_to_ms(1),
             "stem_levels_track_a": {"Vocals": 1.15, "Melody": 0.3, "Bass": 0.0, "Drums": 0.0},
@@ -191,16 +206,16 @@ class LLMArranger:
         s4_ms = grid.bars_to_ms(drop_bars)
         blocks.append({
             "stage_id": 4,
-            "block_name": "Stage 4: The Hybrid Drop",
+            "block_name": f"Stage 4: The Peak Drop ({style_dna.get('style_genre', 'Club Drop')})",
             "start_ms": current_ms,
             "end_ms": current_ms + s4_ms,
             "bars": drop_bars,
             "deck_architecture": {
                 "deck_a": "Track A Hero Vocal Hook",
-                "deck_b": "Track B Heavy Sub-Bass & 4/4 Punchy Drums"
+                "deck_b": f"Track B {style_dna.get('percussion_groove_type', 'Drop Rhythm')} & {style_dna.get('sub_bass_profile', 'Sub-Bass')}"
             },
             "dsp_directives": {
-                "gap_surgeon": "Hero vocal ducks during transient peaks and unmutes in vocal pockets"
+                "gap_surgeon": "Enhanced VAD Spectral Flux active with 10ms cosine crossfades"
             },
             "stem_levels_track_a": {"Vocals": 1.35, "Melody": 0.35, "Bass": 0.0, "Drums": 0.0},
             "stem_levels_track_b": {"Vocals": 0.0, "Melody": 0.2, "Bass": 1.0, "Drums": 1.0}
@@ -224,18 +239,15 @@ class LLMArranger:
         })
 
         return {
-            "mode": "DETERMINISTIC_GAP_SURGERY_PIPELINE",
+            "mode": "STYLE_TRANSFER_HARMONIC_KEY_LOCK_PIPELINE",
             "bpm": bpm,
-            "llm_handoff_rules": [
-                "LLM outputs continuous vocal blocks (e.g. Verse, Drop Hook).",
-                "Python gap_surgeon.py calculates RMS loudness of Track B and applies 10ms crossfaded muting during beats.",
-                "HighpassFilter(250Hz) + NoiseGate(-25dB, 50ms) strips low-end bleed."
-            ],
+            "style_transfer_dna": style_dna,
+            "precision_harmonic_key_lock": pivot_data,
             "default_deck_architecture": {
                 "deck_a": "Track A (Left Deck) -> Sole Hero Vocal & Harmonic Source",
                 "deck_b": "Track B (Right Deck) -> Pure Groove & Sub-Bass Anchor"
             },
-            "pivot_key_data": pivot_data,
+            "total_duration_s": round((current_ms + s5_ms) / 1000.0, 1),
             "arrangement_blocks": blocks
         }
 

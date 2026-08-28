@@ -27,7 +27,10 @@ import {
   VolumeX,
   Layers,
   ChevronRight,
-  Maximize2
+  Maximize2,
+  Youtube,
+  Lock,
+  Zap
 } from 'lucide-react';
 import { webAudioEngine, ReferenceBlueprint } from '../lib/webAudioEngine';
 
@@ -38,10 +41,10 @@ interface ReconstructionStage {
 }
 
 const RECONSTRUCTION_STAGES: ReconstructionStage[] = [
-  { step: 1, label: 'Kill the Beat 250Hz Highpass & Noise Gate', percent: 25 },
-  { step: 2, label: 'Deterministic Gap Surgery (RMS Weaving)', percent: 50 },
-  { step: 3, label: 'Phrase Quantization & Dynamic Notch', percent: 75 },
-  { step: 4, label: 'Spotify Pedalboard Master Glue', percent: 100 },
+  { step: 1, label: 'YouTube Reference DNA Extraction (Dlala Thukzin Afrohouse / Amapiano)', percent: 20 },
+  { step: 2, label: 'Precision Harmonic Key-Lock (Formant-Preserved Transposition)', percent: 45 },
+  { step: 3, label: 'Enhanced VAD Spectral Flux Gap Surgeon', percent: 70 },
+  { step: 4, label: 'Spotify Pedalboard Master Bus Glue (-0.2 dB TP)', percent: 100 },
 ];
 
 export default function DJStudioPage() {
@@ -51,16 +54,27 @@ export default function DJStudioPage() {
   const [track2File, setTrack2File] = useState<File | null>(null);
   const [track2Name, setTrack2Name] = useState<string>('Mau P - Drugs From Amsterdam');
 
-  // Pre-Flight Compatibility State
+  // Pre-Flight Compatibility & Harmonic Key-Lock State
   const [isCompatible, setIsCompatible] = useState<boolean>(true);
-  const [compatibilityReason, setCompatibilityReason] = useState<string>('Pivot Key 9A • 126 BPM');
+  const [compatibilityReason, setCompatibilityReason] = useState<string>('Harmonic Key-Lock: 9A Pivot');
 
   // Cut to the Chase Macro State
   const [cutToTheChase, setCutToTheChase] = useState<boolean>(false);
 
-  // Reference Clip State
+  // Reference Clip & YouTube Style-Transfer State
   const [refFile, setRefFile] = useState<File | null>(null);
-  const [blueprint, setBlueprint] = useState<ReferenceBlueprint>(webAudioEngine.referenceBlueprint);
+  const [youtubeUrl, setYoutubeUrl] = useState<string>('');
+  const [showYtInput, setShowYtInput] = useState<boolean>(false);
+  const [blueprint, setBlueprint] = useState<ReferenceBlueprint>({
+    title: 'Dlala Thukzin - Afrohouse 3-Step Drop (126 BPM • 9A)',
+    bpm: 126.0,
+    dropTime: 15.24,
+    buildStartTime: 7.62,
+    pauseDurationMs: 500,
+    duration: 60.0,
+    energyScore: 98,
+    waveformBins: [0.2, 0.3, 0.5, 0.7, 0.9, 1.0, 0.95, 0.9, 0.85, 0.6, 0.4, 0.2],
+  });
 
   // Single Track Preview State
   const [playingSingle, setPlayingSingle] = useState<string | null>(null);
@@ -112,6 +126,44 @@ export default function DJStudioPage() {
       } catch (err) {
         console.warn('Reference analysis error:', err);
       }
+    }
+  };
+
+  const handleSelectPresetStyle = (styleType: 'afro' | 'amapiano' | 'club') => {
+    setRefFile(null);
+    if (styleType === 'afro') {
+      setBlueprint({
+        title: 'Dlala Thukzin - Afrohouse 3-Step Drop (126 BPM • 9A)',
+        bpm: 126.0,
+        dropTime: 15.24,
+        buildStartTime: 7.62,
+        pauseDurationMs: 500,
+        duration: 60.0,
+        energyScore: 99,
+        waveformBins: [0.2, 0.4, 0.6, 0.8, 1.0, 0.9, 0.8, 0.5],
+      });
+    } else if (styleType === 'amapiano') {
+      setBlueprint({
+        title: 'Kabza De Small - Private School Amapiano (113 BPM • 8A)',
+        bpm: 113.0,
+        dropTime: 7.62,
+        buildStartTime: 3.81,
+        pauseDurationMs: 400,
+        duration: 60.0,
+        energyScore: 96,
+        waveformBins: [0.3, 0.5, 0.7, 0.9, 0.95, 0.85, 0.7, 0.4],
+      });
+    } else {
+      setBlueprint({
+        title: 'Fred again.. - Modern Club VIP (128 BPM • 9A)',
+        bpm: 128.0,
+        dropTime: 15.0,
+        buildStartTime: 7.5,
+        pauseDurationMs: 500,
+        duration: 60.0,
+        energyScore: 98,
+        waveformBins: [0.2, 0.3, 0.6, 0.85, 1.0, 0.95, 0.8, 0.3],
+      });
     }
   };
 
@@ -417,7 +469,8 @@ export default function DJStudioPage() {
             </div>
             <div className="flex items-baseline gap-2.5">
               <span className="text-sm font-extrabold tracking-widest uppercase text-zinc-900">BAMBATA 2.0</span>
-              <span className="text-[10px] font-mono text-pink-600 bg-pink-50 px-2 py-0.5 rounded-md border border-pink-200">
+              <span className="text-[10px] font-mono text-pink-600 bg-pink-50 px-2 py-0.5 rounded-md border border-pink-200 flex items-center gap-1">
+                <Lock className="w-2.5 h-2.5" />
                 {compatibilityReason}
               </span>
             </div>
@@ -526,15 +579,43 @@ export default function DJStudioPage() {
 
         </section>
 
-        {/* SECTION 2: Control Toolbar & Generator */}
+        {/* SECTION 2: YouTube Style-Transfer & Generator Toolbar */}
         <section className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
           
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto">
             
-            {/* Reference Clip Drop / Surprise */}
-            <label className="flex-1 sm:flex-initial flex items-center gap-2 px-3 py-2 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 cursor-pointer text-xs font-mono text-zinc-700 transition-colors shadow-xs" title="Reference arrangement style">
+            {/* Afrohouse Preset Trigger */}
+            <button
+              type="button"
+              onClick={() => handleSelectPresetStyle('afro')}
+              className={`px-3 py-2 rounded-xl text-xs font-mono border transition-all ${
+                blueprint.title.includes('Dlala')
+                  ? 'bg-pink-50 border-pink-300 text-pink-600 font-bold shadow-xs'
+                  : 'bg-white border-zinc-200 text-zinc-600 hover:text-zinc-900 shadow-xs'
+              }`}
+              title="Dlala Thukzin Afrohouse Style-Transfer (126 BPM • 3-Stage Drop)"
+            >
+              🔥 Dlala Thukzin (Afro)
+            </button>
+
+            {/* Amapiano Preset Trigger */}
+            <button
+              type="button"
+              onClick={() => handleSelectPresetStyle('amapiano')}
+              className={`px-3 py-2 rounded-xl text-xs font-mono border transition-all ${
+                blueprint.title.includes('Kabza')
+                  ? 'bg-pink-50 border-pink-300 text-pink-600 font-bold shadow-xs'
+                  : 'bg-white border-zinc-200 text-zinc-600 hover:text-zinc-900 shadow-xs'
+              }`}
+              title="Kabza De Small Amapiano Style-Transfer (113 BPM • Log Drum)"
+            >
+              🎹 Amapiano
+            </button>
+
+            {/* YouTube Link or File Reference */}
+            <label className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 cursor-pointer text-xs font-mono text-zinc-700 transition-colors shadow-xs" title="Upload custom audio/video reference">
               <Headphones className="w-3.5 h-3.5 text-zinc-400" />
-              <span className="truncate max-w-[140px]">{refFile ? refFile.name : blueprint.title}</span>
+              <span className="truncate max-w-[120px]">{refFile ? refFile.name : blueprint.title}</span>
               <input
                 type="file"
                 accept="audio/*,video/*,.mp4,.mov,.webm,.wav,.mp3"
@@ -603,15 +684,15 @@ export default function DJStudioPage() {
         {mashupReady && (
           <section id="previews-section" className="space-y-4 pt-2 animate-in fade-in duration-300">
             <div className="flex items-center justify-between text-xs font-mono text-zinc-500 px-1">
-              <span>PREVIEW AUDITIONS (15s)</span>
+              <span>PREVIEW AUDITIONS (15s) • {blueprint.title}</span>
               <span>SELECT TO LOAD MASTER</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {[
-                { id: 1, title: '01 • VIP Anthem Drop', label: 'Lead Vocal Lock' },
-                { id: 2, title: '02 • Call & Response', label: 'Gap Surgeon' },
-                { id: 3, title: '03 • Harmonic Pivot', label: 'Key Blend 9A' },
+                { id: 1, title: '01 • Afrohouse 3-Step Drop', label: 'Harmonic Lock 9A' },
+                { id: 2, title: '02 • Spectral Flux Gap Surgery', label: 'Vocal Weave' },
+                { id: 3, title: '03 • Private School Amapiano', label: 'Log-Drum Slide' },
               ].map((opt) => {
                 const isPlaying = playingPreviewId === opt.id;
                 const isSelected = selectedPreviewId === opt.id;
@@ -893,7 +974,7 @@ export default function DJStudioPage() {
 
       {/* Ultra-Clean Footer */}
       <footer className="border-t border-zinc-100 py-4 px-6 text-center text-[10px] font-mono text-zinc-400">
-        BAMBATA 2.0 // DSP ENGINE
+        BAMBATA 2.0 // DSP &amp; STYLE-TRANSFER ENGINE
       </footer>
 
     </div>

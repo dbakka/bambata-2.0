@@ -1,13 +1,11 @@
-"""BAMBATA 2.0 - Core DSP Audio Processing Engine with "Kill the Beat" Vocal Filter & Gap Surgeon.
+"""BAMBATA 2.0 - Core DSP Audio Processing Engine.
 
 Features:
-1. "Kill the Beat" Vocal Filter:
-   - HighpassFilter(cutoff_frequency_hz=250.0) -> Deletes all kick/bass bleed.
-   - NoiseGate(threshold_db=-25.0, ratio=10.0, release_ms=50) -> Snaps to pure 0.0 silence.
-2. Deterministic Vocal Gap Masking (RMS envelope weaving).
-3. Anti-Clash 1.5kHz Notch Carving (PeakFilter 1500Hz, Q=2.0, -6dB).
-4. Formant-Preserved Pitch Shifting.
-5. Demucs v4 Separation.
+1. Precision Harmonic Key-Lock Engine (simultaneous bilateral transposition into optimal Pivot Key).
+2. Enhanced VAD Gap-Placement (Spectral Flux & Transient Energy Detection).
+3. "Kill the Beat" Vocal Filter (250Hz Highpass + -25dB NoiseGate).
+4. Dynamic Anti-Clash 1.5kHz Notch Carving (PeakFilter 1500Hz, Q=2.0, -6dB).
+5. Demucs v4 Separation & Formant-Preserved Pitch Shifting.
 """
 import os
 import logging
@@ -34,6 +32,33 @@ try:
 except ImportError:
     HAS_PEDALBOARD = False
 
+try:
+    import pyrubberband as pyrb
+    HAS_PYRUBBERBAND = True
+except ImportError:
+    HAS_PYRUBBERBAND = False
+
+
+def apply_formant_preserved_pitch_shift(
+    audio: np.ndarray,
+    sample_rate: int,
+    semitones: float,
+    is_vocal: bool = False
+) -> np.ndarray:
+    if abs(semitones) < 0.05 or len(audio) == 0:
+        return audio
+
+    if HAS_PYRUBBERBAND:
+        try:
+            return pyrb.pitch_shift(audio, sample_rate, n_steps=semitones, formants=is_vocal).astype(np.float32)
+        except Exception as e:
+            logger.warning(f"pyrubberband pitch shift failed: {e}. Using resample fallback.")
+
+    ratio = 2.0 ** (semitones / 12.0)
+    num_samples = int(len(audio) / ratio)
+    resampled = signal.resample(audio, num_samples)
+    return signal.resample(resampled, len(audio)).astype(np.float32)
+
 
 def apply_kill_the_beat_vocal_filter(
     vocal_audio: np.ndarray,
@@ -43,11 +68,6 @@ def apply_kill_the_beat_vocal_filter(
     gate_ratio: float = 10.0,
     gate_release_ms: float = 50.0
 ) -> np.ndarray:
-    """
-    "Kill the Beat" Vocal Filter:
-    1. 250Hz HighpassFilter -> Completely deletes kicks, basslines, and log drums from vocal stem.
-    2. Strict NoiseGate(-25dB, ratio=10.0, release=50ms) -> Snaps audio to digital 0.0 silence.
-    """
     if len(vocal_audio) == 0:
         return vocal_audio
 
@@ -69,11 +89,9 @@ def apply_kill_the_beat_vocal_filter(
         except Exception as e:
             logger.warning(f"Pedalboard 'Kill the Beat' gate failed: {e}. Using scipy/numpy chain.")
 
-    # High-order Butterworth 250Hz Highpass Filter fallback
     sos_high = signal.butter(6, cutoff_hz, 'highpass', fs=sample_rate, output='sos')
     filtered = signal.sosfilt(sos_high, vocal_audio, axis=0)
 
-    # Fast 50ms Noise Gate Fallback (-25dB threshold)
     mono = np.mean(filtered, axis=1)
     frame_len = max(2, int(0.005 * sample_rate))
     kernel = np.ones(frame_len) / frame_len
@@ -89,19 +107,28 @@ def apply_kill_the_beat_vocal_filter(
     return (filtered * smoothed_gate).astype(np.float32)
 
 
+def compute_spectral_flux(mono_audio: np.ndarray, sample_rate: int = 44100, frame_ms: float = 25.0) -> np.ndarray:
+    n_fft = max(64, int((frame_ms / 1000.0) * sample_rate))
+    hop_length = n_fft // 2
+    freqs, times, stft = signal.stft(mono_audio, fs=sample_rate, nperseg=n_fft, noverlap=n_fft - hop_length)
+    mag = np.abs(stft)
+    diff = np.diff(mag, axis=1)
+    diff[diff < 0] = 0.0
+    flux = np.sum(diff, axis=0)
+    flux_full = np.interp(np.linspace(0, len(flux), len(mono_audio)), np.arange(len(flux)), flux)
+    max_val = np.max(flux_full) if len(flux_full) > 0 else 1.0
+    return (flux_full / max(1e-6, max_val)).astype(np.float32)
+
+
 def apply_vocal_gap_mask(
     vocal_stem: np.ndarray,
     instrumental_stem: np.ndarray,
     sample_rate: int = 44100,
     frame_ms: float = 25.0,
     loudness_threshold_rms: float = 0.08,
-    crossfade_ms: float = 10.0
+    crossfade_ms: float = 10.0,
+    spectral_flux_weight: float = 0.4
 ) -> np.ndarray:
-    """
-    Deterministic Gap Surgeon:
-    Multiplies vocal_stem by 0.0 during loud instrumental transients and 1.0 during silence gaps,
-    with 10ms click-free cosine crossfades.
-    """
     if len(vocal_stem) == 0:
         return vocal_stem
 
@@ -123,13 +150,16 @@ def apply_vocal_gap_mask(
     kernel = np.ones(frame_samples, dtype=np.float32) / frame_samples
     inst_rms = np.sqrt(np.convolve(inst_mono ** 2, kernel, mode='same'))
 
+    flux = compute_spectral_flux(inst_mono, sample_rate, frame_ms)
+
     max_rms = np.max(inst_rms) if len(inst_rms) > 0 else 0.0
     if max_rms > 0.01:
         dynamic_thresh = max(loudness_threshold_rms, np.percentile(inst_rms, 60) * 0.85)
     else:
         dynamic_thresh = loudness_threshold_rms
 
-    raw_mask = np.where(inst_rms < dynamic_thresh, 1.0, 0.0).astype(np.float32)
+    composite_activity = (1.0 - spectral_flux_weight) * (inst_rms / max(1e-5, dynamic_thresh)) + spectral_flux_weight * (flux * 1.5)
+    raw_mask = np.where(composite_activity < 1.0, 1.0, 0.0).astype(np.float32)
 
     fade_samples = max(2, int((crossfade_ms / 1000.0) * sample_rate))
     smoothing_kernel = np.hanning(fade_samples)
@@ -224,37 +254,3 @@ def weld_audio(
     tail = extension_audio[actual_fade:]
 
     return np.vstack((head, cross, tail)).astype(np.float32)
-
-
-class AudioDSPEngine:
-    def __init__(self, sample_rate: int = 44100):
-        self.sample_rate = sample_rate
-
-    def process_and_weave_hero_vocal(
-        self,
-        raw_vocal_stem: np.ndarray,
-        instrumental_stem: np.ndarray
-    ) -> np.ndarray:
-        """
-        1. Deletes beat bleed with 250Hz Highpass & -25dB Noise Gate.
-        2. Weaves the vocal deterministically into instrumental silence gaps.
-        """
-        cleaned_vocal = apply_kill_the_beat_vocal_filter(
-            vocal_audio=raw_vocal_stem,
-            sample_rate=self.sample_rate,
-            cutoff_hz=250.0,
-            gate_threshold_db=-25.0,
-            gate_ratio=10.0,
-            gate_release_ms=50.0
-        )
-
-        woven_vocal = apply_vocal_gap_mask(
-            vocal_stem=cleaned_vocal,
-            instrumental_stem=instrumental_stem,
-            sample_rate=self.sample_rate,
-            frame_ms=25.0,
-            loudness_threshold_rms=0.08,
-            crossfade_ms=10.0
-        )
-
-        return woven_vocal
