@@ -69,6 +69,26 @@ def apply_formant_preserved_pitch_shift(
     return signal.resample(resampled, len(audio)).astype(np.float32)
 
 
+def apply_absolute_groove_key_lock(
+    track_a_vocal: np.ndarray,
+    key_vocal_a: str,
+    key_groove_b: str,
+    sample_rate: int = 44100
+) -> Tuple[np.ndarray, Dict[str, Any]]:
+    """
+    Absolute Groove Key-Lock:
+    Track B (The Groove) dictates the master harmonic key.
+    Track A's Hero Vocal is strictly tuned into Track B's scale with formant preservation.
+    """
+    from app.services.tuning_engine import tune_vocal_to_groove_key
+    return tune_vocal_to_groove_key(
+        vocal_audio=track_a_vocal,
+        key_vocal_a=key_vocal_a,
+        key_groove_b=key_groove_b,
+        sample_rate=sample_rate
+    )
+
+
 def apply_precision_harmonic_key_lock(
     track_a_stems: Dict[str, np.ndarray],
     track_b_stems: Dict[str, np.ndarray],

@@ -28,9 +28,10 @@ import {
   Layers,
   ChevronRight,
   Maximize2,
-  Youtube,
   Lock,
-  Zap
+  Zap,
+  SlidersHorizontal,
+  MoveHorizontal
 } from 'lucide-react';
 import { webAudioEngine, ReferenceBlueprint } from '../lib/webAudioEngine';
 
@@ -41,9 +42,9 @@ interface ReconstructionStage {
 }
 
 const RECONSTRUCTION_STAGES: ReconstructionStage[] = [
-  { step: 1, label: 'YouTube Reference DNA Extraction (Dlala Thukzin Afrohouse / Amapiano)', percent: 20 },
-  { step: 2, label: 'Precision Harmonic Key-Lock (Formant-Preserved Transposition)', percent: 45 },
-  { step: 3, label: 'Enhanced VAD Spectral Flux Gap Surgeon', percent: 70 },
+  { step: 1, label: 'BS-Roformer Studio-Grade Vocal Extraction (100% Clean)', percent: 25 },
+  { step: 2, label: 'Absolute Groove Key-Lock (Formant-Preserved Tuning)', percent: 50 },
+  { step: 3, label: 'Enhanced VAD Spectral Flux Gap Surgeon', percent: 75 },
   { step: 4, label: 'Spotify Pedalboard Master Bus Glue (-0.2 dB TP)', percent: 100 },
 ];
 
@@ -54,17 +55,24 @@ export default function DJStudioPage() {
   const [track2File, setTrack2File] = useState<File | null>(null);
   const [track2Name, setTrack2Name] = useState<string>('Mau P - Drugs From Amsterdam');
 
-  // Pre-Flight Compatibility & Harmonic Key-Lock State
+  // Mix Mode State: 'auto' | 'manual'
+  const [mixMode, setMixMode] = useState<'auto' | 'manual'>('auto');
+
+  // Manual Deck A & Deck B In/Out Regions (in seconds)
+  const [deckAInSec, setDeckAInSec] = useState<number>(0.0);
+  const [deckAOutSec, setDeckAOutSec] = useState<number>(30.0);
+  const [deckBInSec, setDeckBInSec] = useState<number>(15.0);
+  const [deckBOutSec, setDeckBOutSec] = useState<number>(45.0);
+
+  // Pre-Flight Compatibility & Absolute Groove Key-Lock State
   const [isCompatible, setIsCompatible] = useState<boolean>(true);
-  const [compatibilityReason, setCompatibilityReason] = useState<string>('Harmonic Key-Lock: 9A Pivot');
+  const [compatibilityReason, setCompatibilityReason] = useState<string>('Absolute Groove Key-Lock: Deck B Anchor');
 
   // Cut to the Chase Macro State
   const [cutToTheChase, setCutToTheChase] = useState<boolean>(false);
 
-  // Reference Clip & YouTube Style-Transfer State
+  // Reference Clip State
   const [refFile, setRefFile] = useState<File | null>(null);
-  const [youtubeUrl, setYoutubeUrl] = useState<string>('');
-  const [showYtInput, setShowYtInput] = useState<boolean>(false);
   const [blueprint, setBlueprint] = useState<ReferenceBlueprint>({
     title: 'Reference Arrangement',
     bpm: 126.0,
@@ -129,44 +137,6 @@ export default function DJStudioPage() {
     }
   };
 
-  const handleSelectPresetStyle = (styleType: 'afro' | 'amapiano' | 'club') => {
-    setRefFile(null);
-    if (styleType === 'afro') {
-      setBlueprint({
-        title: 'Dlala Thukzin - Afrohouse 3-Step Drop (126 BPM • 9A)',
-        bpm: 126.0,
-        dropTime: 15.24,
-        buildStartTime: 7.62,
-        pauseDurationMs: 500,
-        duration: 60.0,
-        energyScore: 99,
-        waveformBins: [0.2, 0.4, 0.6, 0.8, 1.0, 0.9, 0.8, 0.5],
-      });
-    } else if (styleType === 'amapiano') {
-      setBlueprint({
-        title: 'Kabza De Small - Private School Amapiano (113 BPM • 8A)',
-        bpm: 113.0,
-        dropTime: 7.62,
-        buildStartTime: 3.81,
-        pauseDurationMs: 400,
-        duration: 60.0,
-        energyScore: 96,
-        waveformBins: [0.3, 0.5, 0.7, 0.9, 0.95, 0.85, 0.7, 0.4],
-      });
-    } else {
-      setBlueprint({
-        title: 'Fred again.. - Modern Club VIP (128 BPM • 9A)',
-        bpm: 128.0,
-        dropTime: 15.0,
-        buildStartTime: 7.5,
-        pauseDurationMs: 500,
-        duration: 60.0,
-        energyScore: 98,
-        waveformBins: [0.2, 0.3, 0.6, 0.85, 1.0, 0.95, 0.8, 0.3],
-      });
-    }
-  };
-
   const handleSurpriseMe = () => {
     setRefFile(null);
     const surprise = webAudioEngine.setSurpriseReference();
@@ -226,6 +196,10 @@ export default function DJStudioPage() {
   const handleStartDeepReconstruction = () => {
     webAudioEngine.stop();
     webAudioEngine.isCutToTheChase = cutToTheChase;
+    webAudioEngine.isManualMode = (mixMode === 'manual');
+    webAudioEngine.manualDeckARegion = [deckAInSec, deckAOutSec];
+    webAudioEngine.manualDeckBRegion = [deckBInSec, deckBOutSec];
+
     setIsProcessing(true);
     setMashupReady(false);
     setFullSongReady(false);
@@ -476,7 +450,34 @@ export default function DJStudioPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            
+            {/* Mix Mode: Auto vs. Manual Toggle Switch */}
+            <div className="flex items-center bg-zinc-100 p-1 rounded-xl border border-zinc-200">
+              <button
+                type="button"
+                onClick={() => setMixMode('auto')}
+                className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all ${
+                  mixMode === 'auto'
+                    ? 'bg-white text-zinc-900 shadow-xs'
+                    : 'text-zinc-500 hover:text-zinc-900'
+                }`}
+              >
+                Auto AI
+              </button>
+              <button
+                type="button"
+                onClick={() => setMixMode('manual')}
+                className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all ${
+                  mixMode === 'manual'
+                    ? 'bg-pink-500 text-white shadow-xs'
+                    : 'text-zinc-500 hover:text-zinc-900'
+                }`}
+              >
+                Manual In/Out
+              </button>
+            </div>
+
             {(mashupReady || fullSongReady) && (
               <button
                 type="button"
@@ -503,7 +504,7 @@ export default function DJStudioPage() {
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-pink-500" />
                 <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-pink-600">
-                  DECK A • HERO VOCAL
+                  DECK A • HERO VOCAL (BS-ROFORMER)
                 </span>
               </div>
               <button
@@ -543,7 +544,7 @@ export default function DJStudioPage() {
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-zinc-400" />
                 <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-zinc-600">
-                  DECK B • GROOVE &amp; BASS
+                  DECK B • GROOVE &amp; BASS (MASTER KEY ANCHOR)
                 </span>
               </div>
               <button
@@ -578,6 +579,143 @@ export default function DJStudioPage() {
           </div>
 
         </section>
+
+        {/* MANUAL DUAL-DECK IN/OUT TIMELINE (Rendered in Manual Mode) */}
+        {mixMode === 'manual' && (
+          <section className="bg-zinc-50 border border-pink-200 rounded-3xl p-6 space-y-6 shadow-sm animate-in fade-in duration-300">
+            <div className="flex items-center justify-between border-b border-zinc-200/80 pb-3">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="w-4 h-4 text-pink-500" />
+                <span className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-800">
+                  MANUAL IN/OUT LOOP SELECTOR
+                </span>
+              </div>
+              <span className="text-[10px] font-mono text-pink-600 bg-pink-50 px-2 py-0.5 rounded border border-pink-200">
+                DRAG SLIDERS TO LOCK PHRASE
+              </span>
+            </div>
+
+            <div className="space-y-5">
+              
+              {/* Deck A Manual Timeline */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-[11px] font-mono">
+                  <span className="font-bold text-pink-600">DECK A (HERO VOCAL): {deckAInSec.toFixed(1)}s → {deckAOutSec.toFixed(1)}s</span>
+                  <span className="text-zinc-400">{(deckAOutSec - deckAInSec).toFixed(1)}s CHUNK</span>
+                </div>
+                
+                {/* Waveform timeline with In/Out Region Overlay */}
+                <div className="h-16 bg-white rounded-xl p-2 relative flex items-end gap-1 border border-zinc-200 overflow-hidden">
+                  <div
+                    style={{
+                      left: `${(deckAInSec / 60.0) * 100}%`,
+                      width: `${((deckAOutSec - deckAInSec) / 60.0) * 100}%`,
+                    }}
+                    className="absolute top-0 bottom-0 bg-pink-500/20 border-x-2 border-pink-500 pointer-events-none z-10"
+                  />
+                  {Array.from({ length: 48 }).map((_, i) => (
+                    <div
+                      key={i}
+                      style={{ height: `${20 + (i % 5) * 15}%` }}
+                      className={`flex-1 rounded-sm ${
+                        (i / 48) * 60 >= deckAInSec && (i / 48) * 60 <= deckAOutSec
+                          ? 'bg-pink-500'
+                          : 'bg-zinc-200'
+                      }`}
+                    />
+                  ))}
+                </div>
+
+                {/* Range Sliders */}
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-zinc-500">In:</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="55"
+                      step="0.5"
+                      value={deckAInSec}
+                      onChange={(e) => setDeckAInSec(Math.min(parseFloat(e.target.value), deckAOutSec - 2))}
+                      className="w-full accent-pink-500 h-1 bg-zinc-200 rounded-lg cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-zinc-500">Out:</span>
+                    <input
+                      type="range"
+                      min="5"
+                      max="60"
+                      step="0.5"
+                      value={deckAOutSec}
+                      onChange={(e) => setDeckAOutSec(Math.max(parseFloat(e.target.value), deckAInSec + 2))}
+                      className="w-full accent-pink-500 h-1 bg-zinc-200 rounded-lg cursor-pointer"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Deck B Manual Timeline */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-[11px] font-mono">
+                  <span className="font-bold text-zinc-700">DECK B (GROOVE &amp; BASS): {deckBInSec.toFixed(1)}s → {deckBOutSec.toFixed(1)}s</span>
+                  <span className="text-zinc-400">{(deckBOutSec - deckBInSec).toFixed(1)}s CHUNK</span>
+                </div>
+                
+                {/* Waveform timeline with In/Out Region Overlay */}
+                <div className="h-16 bg-white rounded-xl p-2 relative flex items-end gap-1 border border-zinc-200 overflow-hidden">
+                  <div
+                    style={{
+                      left: `${(deckBInSec / 60.0) * 100}%`,
+                      width: `${((deckBOutSec - deckBInSec) / 60.0) * 100}%`,
+                    }}
+                    className="absolute top-0 bottom-0 bg-zinc-900/15 border-x-2 border-zinc-900 pointer-events-none z-10"
+                  />
+                  {Array.from({ length: 48 }).map((_, i) => (
+                    <div
+                      key={i}
+                      style={{ height: `${30 + (i % 4) * 18}%` }}
+                      className={`flex-1 rounded-sm ${
+                        (i / 48) * 60 >= deckBInSec && (i / 48) * 60 <= deckBOutSec
+                          ? 'bg-zinc-800'
+                          : 'bg-zinc-200'
+                      }`}
+                    />
+                  ))}
+                </div>
+
+                {/* Range Sliders */}
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-zinc-500">In:</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="55"
+                      step="0.5"
+                      value={deckBInSec}
+                      onChange={(e) => setDeckBInSec(Math.min(parseFloat(e.target.value), deckBOutSec - 2))}
+                      className="w-full accent-zinc-800 h-1 bg-zinc-200 rounded-lg cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-zinc-500">Out:</span>
+                    <input
+                      type="range"
+                      min="5"
+                      max="60"
+                      step="0.5"
+                      value={deckBOutSec}
+                      onChange={(e) => setDeckBOutSec(Math.max(parseFloat(e.target.value), deckBInSec + 2))}
+                      className="w-full accent-zinc-800 h-1 bg-zinc-200 rounded-lg cursor-pointer"
+                    />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </section>
+        )}
 
         {/* SECTION 2: Control Toolbar & Generator */}
         <section className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
@@ -629,7 +767,7 @@ export default function DJStudioPage() {
             className="w-full sm:w-auto flex items-center justify-center gap-2.5 bg-pink-500 hover:bg-pink-600 text-white font-extrabold text-xs uppercase font-mono px-8 py-3 rounded-xl shadow-md shadow-pink-500/25 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
           >
             <Sparkles className="w-4 h-4 fill-current" />
-            <span>{isProcessing ? 'Synthesizing...' : 'Reconstruct'}</span>
+            <span>{isProcessing ? 'Synthesizing...' : mixMode === 'manual' ? 'Reconstruct (Manual)' : 'Reconstruct (Auto)'}</span>
           </button>
         </section>
 
@@ -662,9 +800,9 @@ export default function DJStudioPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {[
-                { id: 1, title: '01 • VIP Anthem Drop', label: 'Harmonic Lock 9A' },
+                { id: 1, title: '01 • VIP Anthem Drop', label: 'Groove Key-Lock' },
                 { id: 2, title: '02 • Call & Response', label: 'Vocal Gap Surgery' },
-                { id: 3, title: '03 • Harmonic Pivot', label: 'Key Blend 9A' },
+                { id: 3, title: '03 • Harmonic Pivot', label: 'BS-Roformer Vocal' },
               ].map((opt) => {
                 const isPlaying = playingPreviewId === opt.id;
                 const isSelected = selectedPreviewId === opt.id;
@@ -946,7 +1084,7 @@ export default function DJStudioPage() {
 
       {/* Ultra-Clean Footer */}
       <footer className="border-t border-zinc-100 py-4 px-6 text-center text-[10px] font-mono text-zinc-400">
-        BAMBATA 2.0 // DSP &amp; STYLE-TRANSFER ENGINE
+        BAMBATA 2.0 // BS-ROFORMER &amp; GROOVE KEY-LOCK ENGINE
       </footer>
 
     </div>
