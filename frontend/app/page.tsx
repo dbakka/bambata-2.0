@@ -66,7 +66,7 @@ export default function DJStudioPage() {
   const [youtubeUrl, setYoutubeUrl] = useState<string>('');
   const [showYtInput, setShowYtInput] = useState<boolean>(false);
   const [blueprint, setBlueprint] = useState<ReferenceBlueprint>({
-    title: 'Dlala Thukzin - Afrohouse 3-Step Drop (126 BPM • 9A)',
+    title: 'Reference Arrangement',
     bpm: 126.0,
     dropTime: 15.24,
     buildStartTime: 7.62,
@@ -579,43 +579,15 @@ export default function DJStudioPage() {
 
         </section>
 
-        {/* SECTION 2: YouTube Style-Transfer & Generator Toolbar */}
+        {/* SECTION 2: Control Toolbar & Generator */}
         <section className="bg-zinc-50 border border-zinc-200/80 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
           
-          <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             
-            {/* Afrohouse Preset Trigger */}
-            <button
-              type="button"
-              onClick={() => handleSelectPresetStyle('afro')}
-              className={`px-3 py-2 rounded-xl text-xs font-mono border transition-all ${
-                blueprint.title.includes('Dlala')
-                  ? 'bg-pink-50 border-pink-300 text-pink-600 font-bold shadow-xs'
-                  : 'bg-white border-zinc-200 text-zinc-600 hover:text-zinc-900 shadow-xs'
-              }`}
-              title="Dlala Thukzin Afrohouse Style-Transfer (126 BPM • 3-Stage Drop)"
-            >
-              🔥 Dlala Thukzin (Afro)
-            </button>
-
-            {/* Amapiano Preset Trigger */}
-            <button
-              type="button"
-              onClick={() => handleSelectPresetStyle('amapiano')}
-              className={`px-3 py-2 rounded-xl text-xs font-mono border transition-all ${
-                blueprint.title.includes('Kabza')
-                  ? 'bg-pink-50 border-pink-300 text-pink-600 font-bold shadow-xs'
-                  : 'bg-white border-zinc-200 text-zinc-600 hover:text-zinc-900 shadow-xs'
-              }`}
-              title="Kabza De Small Amapiano Style-Transfer (113 BPM • Log Drum)"
-            >
-              🎹 Amapiano
-            </button>
-
-            {/* YouTube Link or File Reference */}
-            <label className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 cursor-pointer text-xs font-mono text-zinc-700 transition-colors shadow-xs" title="Upload custom audio/video reference">
+            {/* Reference Clip Drop / Surprise */}
+            <label className="flex-1 sm:flex-initial flex items-center gap-2 px-3 py-2 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 cursor-pointer text-xs font-mono text-zinc-700 transition-colors shadow-xs" title="Reference arrangement style">
               <Headphones className="w-3.5 h-3.5 text-zinc-400" />
-              <span className="truncate max-w-[120px]">{refFile ? refFile.name : blueprint.title}</span>
+              <span className="truncate max-w-[140px]">{refFile ? refFile.name : blueprint.title}</span>
               <input
                 type="file"
                 accept="audio/*,video/*,.mp4,.mov,.webm,.wav,.mp3"
@@ -684,15 +656,15 @@ export default function DJStudioPage() {
         {mashupReady && (
           <section id="previews-section" className="space-y-4 pt-2 animate-in fade-in duration-300">
             <div className="flex items-center justify-between text-xs font-mono text-zinc-500 px-1">
-              <span>PREVIEW AUDITIONS (15s) • {blueprint.title}</span>
+              <span>PREVIEW AUDITIONS (15s)</span>
               <span>SELECT TO LOAD MASTER</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {[
-                { id: 1, title: '01 • Afrohouse 3-Step Drop', label: 'Harmonic Lock 9A' },
-                { id: 2, title: '02 • Spectral Flux Gap Surgery', label: 'Vocal Weave' },
-                { id: 3, title: '03 • Private School Amapiano', label: 'Log-Drum Slide' },
+                { id: 1, title: '01 • VIP Anthem Drop', label: 'Harmonic Lock 9A' },
+                { id: 2, title: '02 • Call & Response', label: 'Vocal Gap Surgery' },
+                { id: 3, title: '03 • Harmonic Pivot', label: 'Key Blend 9A' },
               ].map((opt) => {
                 const isPlaying = playingPreviewId === opt.id;
                 const isSelected = selectedPreviewId === opt.id;
