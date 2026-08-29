@@ -20,8 +20,12 @@
 }
 
 :root {
-  --background: #ffffff;
+  --background: #fafafa;
   --foreground: #18181b;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
@@ -29,13 +33,22 @@ body {
   color: var(--foreground);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   overflow-x: hidden;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.012em;
+  margin: 0;
+  padding: 0;
+}
+
+/* Ensure all SVG icons are constrained */
+svg {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
 }
 
 /* Custom Minimalist Pink Scrollbar */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {

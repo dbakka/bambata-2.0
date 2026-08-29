@@ -79,7 +79,19 @@ def tune_vocal_to_groove_key(
             tuned = pyrb.pitch_shift(vocal_audio, sample_rate, n_steps=shift, formants=True).astype(np.float32)
             return tuned, tuning_meta
         except Exception as e:
-            logger.warning(f"pyrubberband formant pitch shift failed: {e}. Using resample fallback.")
+            logger.warning(f"pyrubberband pitch shift failed: {e}. Falling back to librosa.effects.pitch_shift.")
+
+    try:
+        import librosa
+        if vocal_audio.ndim == 2:
+            left = librosa.effects.pitch_shift(y=vocal_audio[:, 0], sr=sample_rate, n_steps=shift)
+            right = librosa.effects.pitch_shift(y=vocal_audio[:, 1], sr=sample_rate, n_steps=shift)
+            tuned = np.column_stack((left, right)).astype(np.float32)
+        else:
+            tuned = librosa.effects.pitch_shift(y=vocal_audio, sr=sample_rate, n_steps=shift).astype(np.float32)
+        return tuned, tuning_meta
+    except Exception as e:
+        logger.warning(f"librosa.effects.pitch_shift fallback failed: {e}. Using resample fallback.")
 
     ratio = 2.0 ** (shift / 12.0)
     num_samples = int(len(vocal_audio) / ratio)

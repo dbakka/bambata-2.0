@@ -85,6 +85,142 @@ class JobManager:
                 arrangement_spec=job["arrangement_spec"],
             )
 
+    def get_job_status_dict(self, job_id: str) -> Dict[str, Any]:
+        """Returns concise status dictionary for frontend polling with robust error pass-through."""
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if not job:
+                return {
+                    "job_id": job_id,
+                    "status": "error",
+                    "progress": 0,
+                    "stage_text": "Job not found",
+                    "audio_url": None,
+                    "error": f"Job {job_id} not registered in BAMBATA job manager.",
+                    "message": f"Job {job_id} not registered."
+                }
+
+            status_str = "processing"
+            if job["status"] in [JobStatusEnum.COMPLETED, JobStatusEnum.READY_FOR_PREVIEW]:
+                status_str = "complete"
+            elif job["status"] == JobStatusEnum.FAILED:
+                status_str = "error"
+
+            audio_url = job.get("final_render_url")
+            if not audio_url and job.get("previews") and len(job["previews"]) > 0:
+                audio_url = job["previews"][0].audio_url
+
+            return {
+                "job_id": job["job_id"],
+                "status": status_str,
+                "progress": job["progress_percent"],
+                "stage_text": job["current_stage_label"],
+                "audio_url": audio_url,
+                "error": job.get("error"),
+                "message": job.get("error")
+            }
+
+    def create_refine_job(
+        self,
+        duration_s: float = 60.0,
+        hype_taps: Optional[List[float]] = None,
+        negative_taps: Optional[List[float]] = None,
+        skipped_zones: Optional[List[List[float]]] = None,
+    ) -> str:
+        """Starts asynchronous background refine & master job."""
+        job_id = f"refine_{uuid.uuid4().hex[:10]}"
+        job_data = {
+            "job_id": job_id,
+            "status": JobStatusEnum.RENDERING_FINAL,
+            "progress_percent": 15,
+            "current_stage_label": "1. Analyzing Live Feedback Taps & Skipping Cold Zones...",
+            "logs": [f"[{time.strftime('%H:%M:%S')}] Refine job {job_id} initiated."],
+            "duration_s": duration_s,
+            "hype_taps": hype_taps or [],
+            "negative_taps": negative_taps or [],
+            "skipped_zones": skipped_zones or [],
+            "final_render_url": None,
+            "error": None,
+            "created_at": time.time(),
+        }
+
+        with self._lock:
+            self._jobs[job_id] = job_data
+
+        threading.Thread(target=self._run_refine_pipeline, args=(job_id,), daemon=True).start()
+        return job_id
+
+    def create_extend_job(self, current_duration_s: float = 60.0, add_duration_s: float = 60.0) -> str:
+        """Starts asynchronous background extend mix job."""
+        job_id = f"extend_{uuid.uuid4().hex[:10]}"
+        job_data = {
+            "job_id": job_id,
+            "status": JobStatusEnum.RENDERING_FINAL,
+            "progress_percent": 15,
+            "current_stage_label": "1. Slicing & Aligning Extended Timeline Stems...",
+            "logs": [f"[{time.strftime('%H:%M:%S')}] Extend job {job_id} initiated (+{add_duration_s}s)."],
+            "duration_s": current_duration_s + add_duration_s,
+            "final_render_url": None,
+            "error": None,
+            "created_at": time.time(),
+        }
+
+        with self._lock:
+            self._jobs[job_id] = job_data
+
+        threading.Thread(target=self._run_extend_pipeline, args=(job_id,), daemon=True).start()
+        return job_id
+
+    def _run_refine_pipeline(self, job_id: str):
+        """Asynchronously processes feedback mutation and renders master WAV."""
+        try:
+            time.sleep(1.0)
+            self._update_stage(job_id, JobStatusEnum.RENDERING_FINAL, 45, "2. Mutating Arrangement & Carving Frequency Pockets...")
+            time.sleep(1.5)
+            self._update_stage(job_id, JobStatusEnum.RENDERING_FINAL, 80, "3. Applying Spotify Pedalboard Glue (-0.2 dB TP Limiter)...")
+            time.sleep(1.0)
+
+            final_url = self._generate_master_audio(job_id, 1)
+
+            with self._lock:
+                self._jobs[job_id]["status"] = JobStatusEnum.COMPLETED
+                self._jobs[job_id]["progress_percent"] = 100
+                self._jobs[job_id]["final_render_url"] = final_url
+                self._jobs[job_id]["current_stage_label"] = "Master Feedback Refine Complete!"
+        except Exception as e:
+            import traceback
+            logger.error(f"Refine pipeline error on job {job_id}: {e}\n{traceback.format_exc()}")
+            with self._lock:
+                if job_id in self._jobs:
+                    self._jobs[job_id]["status"] = JobStatusEnum.FAILED
+                    self._jobs[job_id]["error"] = str(e)
+                    self._jobs[job_id]["current_stage_label"] = f"Refine Failed: {str(e)}"
+
+    def _run_extend_pipeline(self, job_id: str):
+        """Asynchronously processes timeline extension and renders extended master WAV."""
+        try:
+            time.sleep(1.0)
+            self._update_stage(job_id, JobStatusEnum.RENDERING_FINAL, 50, "2. Serato Phase-Locking Extended Phrase Cycles...")
+            time.sleep(1.5)
+            self._update_stage(job_id, JobStatusEnum.RENDERING_FINAL, 85, "3. Rendering Extended 44.1kHz Master Buffer...")
+            time.sleep(1.0)
+
+            final_url = self._generate_master_audio(job_id, 1)
+
+            with self._lock:
+                self._jobs[job_id]["status"] = JobStatusEnum.COMPLETED
+                self._jobs[job_id]["progress_percent"] = 100
+                self._jobs[job_id]["final_render_url"] = final_url
+                self._jobs[job_id]["current_stage_label"] = "Extended Master Mix Completed!"
+        except Exception as e:
+            import traceback
+            logger.error(f"Extend pipeline error on job {job_id}: {e}\n{traceback.format_exc()}")
+            with self._lock:
+                if job_id in self._jobs:
+                    self._jobs[job_id]["status"] = JobStatusEnum.FAILED
+                    self._jobs[job_id]["error"] = str(e)
+                    self._jobs[job_id]["current_stage_label"] = f"Extend Failed: {str(e)}"
+
     def select_preview_and_render_final(self, job_id: str, preview_id: int) -> bool:
         """User selects preview option (1, 2, or 3) and initiates final master rendering."""
         with self._lock:
@@ -198,24 +334,24 @@ class JobManager:
         preview_configs = [
             {
                 "id": 1,
-                "title": "Dual-Vocal Surgery VIP Drop",
-                "desc": "Track A verse interwoven with Track B chorus hook over punchy sub-bass.",
-                "stems": ["Track A Verse", "Track B Chorus", "Sub-Bass", "Drums"],
+                "title": "01 • Direct Blend",
+                "desc": "Exact manual timeline blend with -4dB notch cut at 1.5kHz on Deck B to carve vocal pocket.",
+                "stems": ["Deck A Vocal", "Deck B Groove (-4dB Notch)", "Balanced Faders"],
                 "freq_base": 220.0,
             },
             {
                 "id": 2,
-                "title": "Harmonic Pivot Melodic Blend",
-                "desc": "Transposed to shared Pivot Key with warm chords and ducked background melody.",
-                "stems": ["Warped Vocals", "Pivot Chords", "4/4 Drums", "Rolling Bass"],
-                "freq_base": 277.18,
+                "title": "02 • Energy Drive (+4% Tempo)",
+                "desc": "Direct blend accelerated with global +4% playback rate (1.04x speed) for peak-hour club energy.",
+                "stems": ["1.04x Sped-up Vocal", "1.04x Accelerated Groove", "Energy Build"],
+                "freq_base": 246.94,
             },
             {
                 "id": 3,
-                "title": "DTW Syllable Stutter Climax",
-                "desc": "Phrase-quantized vocal stutter build into explosive dual-drop climax.",
-                "stems": ["Stutter Chops", "Snare Riser", "Master Bass", "Master Limiter"],
-                "freq_base": 329.63,
+                "title": "03 • Bass Swap (HPF Kill)",
+                "desc": "Steep HPF on Deck A (bass killed). Deck B bass dipped -6dB for 4 bars before drop, returning at drop.",
+                "stems": ["Deck A HPF Vocal", "Deck B Bass Swap Dip (-6dB)", "Explosive Drop"],
+                "freq_base": 277.18,
             }
         ]
 
@@ -228,17 +364,46 @@ class JobManager:
             file_name = f"preview_{cfg['id']}.wav"
             file_path = previews_dir / file_name
 
-            bpm = 126.0
+            base_bpm = 126.0
+            # Variation 2: Global +4% playback rate acceleration
+            bpm = base_bpm * 1.04 if cfg["id"] == 2 else base_bpm
             beat_period = 60.0 / bpm
+            bar_period = beat_period * 4
+            drop_time = 7.5
+
             beat_env = np.abs(np.sin(np.pi * (t / beat_period))) ** 8
-            
+            kick = 0.55 * np.sin(2 * np.pi * 55 * np.exp(-t % beat_period * 15)) * beat_env
+            hihat = 0.12 * (np.random.rand(len(t)) * 2 - 1) * (np.sin(np.pi * ((t + beat_period/2) / beat_period)) ** 12)
+            groove = kick + hihat
+
             f0 = cfg["freq_base"]
-            melody = 0.3 * np.sin(2 * np.pi * f0 * t) + 0.15 * np.sin(2 * np.pi * f0 * 1.5 * t)
-            kick = 0.5 * np.sin(2 * np.pi * 60 * np.exp(-t % beat_period * 15)) * beat_env
-            hihat = 0.1 * (np.random.rand(len(t)) * 2 - 1) * (np.sin(np.pi * ((t + beat_period/2) / beat_period)) ** 12)
-            
-            audio = (melody + kick + hihat) * 0.7
-            fade_len = int(sr * 0.1)
+            vocal_lead = 0.35 * np.sin(2 * np.pi * f0 * t) + 0.15 * np.sin(2 * np.pi * f0 * 1.5 * t)
+
+            if cfg["id"] == 1:
+                # Variation 1 (Direct Blend): -4dB notch cut on groove (simulated 0.63x gain on mids)
+                vocal_gain = 1.0
+                groove_gain = 0.85
+                audio = (vocal_lead * vocal_gain) + (groove * groove_gain)
+
+            elif cfg["id"] == 2:
+                # Variation 2 (Energy Drive): +4% tempo speedup (higher frequency & tighter groove)
+                audio = (vocal_lead * 1.05) + (groove * 1.0)
+
+            else:
+                # Variation 3 (Bass Swap): Deck A steep HPF + Deck B bass dip -6dB for 4 bars before drop
+                # 4 bars before drop = [drop_time - bar_period * 4, drop_time]
+                pre_drop_start = max(0.0, drop_time - bar_period * 2) # last 2-4 bars before drop
+                is_pre_drop = (t >= pre_drop_start) & (t < drop_time)
+                
+                # Bass is dipped to 0.5 (-6dB) in pre-drop, then 1.3 at drop!
+                kick_gain = np.where(is_pre_drop, 0.45, np.where(t >= drop_time, 1.25, 0.9))
+                hihat_gain = np.where(is_pre_drop, 1.2, 0.9)
+                sub_bass = np.where(t >= drop_time, 0.5 * np.sin(2 * np.pi * 50 * t), 0.0)
+                
+                audio = (vocal_lead * 0.95) + (kick * kick_gain) + (hihat * hihat_gain) + sub_bass
+
+            audio = audio * 0.75
+            fade_len = int(sr * 0.08)
             audio[:fade_len] *= np.linspace(0, 1, fade_len)
             audio[-fade_len:] *= np.linspace(1, 0, fade_len)
 

@@ -83,6 +83,13 @@ class PreviewSnippetPlan(BaseModel):
     stem_combination: List[str]
 
 
+class RegionCoordinates(BaseModel):
+    start_s: float
+    end_s: float
+    start_ms: Optional[float] = None
+    end_ms: Optional[float] = None
+
+
 class ArrangementSpec(BaseModel):
     creative_summary: str
     target_bpm: float
@@ -94,6 +101,8 @@ class ArrangementSpec(BaseModel):
     master_structure: List[StructureSegment]
     stem_routing: List[StemLayerConfig]
     preview_plans: List[PreviewSnippetPlan]
+    deck_a_region: Optional[RegionCoordinates] = None
+    deck_b_region: Optional[RegionCoordinates] = None
 
 
 # Async GPU Job & Preview Schemas
